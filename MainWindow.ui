@@ -55,11 +55,6 @@
       <widget class="QTableWidget" name="tableWidget">
        <column>
         <property name="text">
-         <string>№</string>
-        </property>
-       </column>
-       <column>
-        <property name="text">
          <string>Дата</string>
         </property>
        </column>
@@ -71,6 +66,11 @@
        <column>
         <property name="text">
          <string>Категория</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Описание</string>
         </property>
        </column>
       </widget>
