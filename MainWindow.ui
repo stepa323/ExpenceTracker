@@ -6,48 +6,42 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1116</width>
-    <height>900</height>
+    <width>1920</width>
+    <height>1009</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>FinTracker</string>
+  </property>
+  <property name="autoFillBackground">
+   <bool>false</bool>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">)</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>30</y>
-      <width>411</width>
+      <x>140</x>
+      <y>610</y>
+      <width>451</width>
       <height>246</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout">
      <item>
-      <widget class="QPushButton" name="addBtn">
-       <property name="font">
-        <font>
-         <pointsize>10</pointsize>
-        </font>
-       </property>
-       <property name="text">
-        <string>Добавить операцию</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QLabel" name="label_2">
        <property name="font">
         <font>
-         <pointsize>10</pointsize>
+         <pointsize>11</pointsize>
         </font>
        </property>
        <property name="text">
-        <string>Последние операции:</string>
+        <string>Последние транзакции</string>
        </property>
        <property name="alignment">
-        <set>Qt::AlignCenter</set>
+        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
        </property>
       </widget>
      </item>
@@ -75,7 +69,97 @@
        </column>
       </widget>
      </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QPushButton" name="addBtn">
+         <property name="font">
+          <font>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Добавить доход</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="deleteBtn">
+         <property name="font">
+          <font>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Удалить расход</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
     </layout>
+   </widget>
+   <widget class="QLabel" name="label">
+    <property name="geometry">
+     <rect>
+      <x>740</x>
+      <y>10</y>
+      <width>341</width>
+      <height>61</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Segoe UI Black</family>
+      <pointsize>30</pointsize>
+      <weight>50</weight>
+      <italic>false</italic>
+      <bold>false</bold>
+      <strikeout>false</strikeout>
+      <stylestrategy>PreferAntialias</stylestrategy>
+      <kerning>true</kerning>
+     </font>
+    </property>
+    <property name="text">
+     <string>FinTracker</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_3">
+    <property name="geometry">
+     <rect>
+      <x>150</x>
+      <y>170</y>
+      <width>331</width>
+      <height>61</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Segoe UI Black</family>
+      <pointsize>30</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>12.345.600,0₽</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QGraphicsView" name="view">
+    <property name="geometry">
+     <rect>
+      <x>140</x>
+      <y>310</y>
+      <width>450</width>
+      <height>250</height>
+     </rect>
+    </property>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -83,7 +167,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1116</width>
+     <width>1920</width>
      <height>21</height>
     </rect>
    </property>
