@@ -6,15 +6,16 @@ from PyQt6 import uic
 from PyQt6.QtCore import QDate, QTime, QRectF
 from PyQt6.QtGui import QBrush, QColor, QFont
 from PyQt6.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QDialog, QGraphicsRectItem, QGraphicsScene, \
-    QVBoxLayout, QGraphicsView, QGraphicsTextItem
+    QVBoxLayout, QGraphicsView, QGraphicsTextItem, QButtonGroup
 
 
-class AddExpensesWidget(QDialog):
+class AddExpenseWidget(QDialog):
     def __init__(self, parent, lst):
         super().__init__(parent)
         uic.loadUi('AddExpensesWidget.ui', self)
         self.comboBox.addItems(lst)
         self.dateTimeEdit.setMinimumDate(QDate.currentDate().addDays(-365 * 5))
+        self.dateTimeEdit.setMaximumDate(QDate.currentDate())
         self.dateTimeEdit.setDate(QDate.currentDate())
         self.dateTimeEdit.setTime(QTime.currentTime())
         self.buttonBox.accepted.connect(self.accept)
@@ -30,25 +31,40 @@ class MainWindow(QMainWindow):
         uic.loadUi('MainWindow.ui', self)
         self.connection = sqlite3.connect("DB.sqlite")
         self.categories = [el[0] for el in self.connection.cursor().execute('select name from categories').fetchall()]
+        self.buttonGroup.setId(self.weekBtn, 0)
+        self.buttonGroup.setId(self.monthBtn, 1)
+        self.buttonGroup.setId(self.yearBtn, 2)
+        self.buttonGroup.buttonToggled.connect(self.plot_expenses)
 
-        self.addBtn.clicked.connect(self.addExpenses)
+        self.addExpenseBtn.clicked.connect(self.addExpense)
+        self.addIncomeBtn.clicked.connect(self.addIncome)
 
-        self.tableWidget.cellChanged.connect(self.tableChanged)
         self.scene = QGraphicsScene(self)
-        self.view.setScene(self.scene)  # view - это QGraphicsView из Qt Designer
-
-        # Рисуем график самых затратных категорий
+        self.view.setScene(self.scene)
         self.plot_expenses()
-
-
         self.select_data()
 
 
     def select_data(self):
-        query = ("select date, amount, name, description from expenses\n"
-                 "inner join categories on categories.id = expenses.category_id")
-        res = sorted(self.connection.cursor().execute(query).fetchall(),
-                     key=lambda x: datetime.strptime(x[0], "%d.%m.%Y %H:%M"), reverse=True)
+        query = '''SELECT 
+    t.date, 
+    t.amount, 
+    CASE 
+        WHEN t.is_expense = 1 THEN c.name
+        ELSE i.name
+    END AS category_name, 
+    t.description
+FROM 
+    transactions t
+LEFT JOIN 
+    categories c ON t.category_id = c.id
+LEFT JOIN 
+    income i ON t.category_id = i.id
+WHERE 
+    t.is_expense IN (0, 1)
+ORDER BY 
+    t.date DESC;'''
+        res = self.connection.cursor().execute(query).fetchall()
         self.tableWidget.setColumnCount(4)
         self.tableWidget.setRowCount(0)
 
@@ -60,86 +76,79 @@ class MainWindow(QMainWindow):
                     i, j, QTableWidgetItem(str(elem)))
         self.refresh_graph()
 
-
-    def addExpenses(self):
-        widget = AddExpensesWidget(self, self.categories)
+    def addExpense(self):
+        widget = AddExpenseWidget(self, self.categories)
         if widget.exec() == 1:
             values = widget.get_input()
             if values != 0:
-                sql = f"""insert into expenses(date, amount, category_id, description) 
-                    values("{values[1]}", {values[0]}, (select id from categories where name = "{values[2]}"), "{values[3]}")"""
+                sql = f"""insert into transactions(date, amount, category_id, description, is_expense) 
+                    values("{values[1]}", {values[0]}, (select id from categories where name = "{values[2]}"), "{values[3]}", 1)"""
                 self.connection.cursor().execute(sql)
                 self.connection.commit()
                 self.select_data()
 
+    def addIncome(self):
+        ...
 
     def tableChanged(self):
         ...
 
-
     def plot_expenses(self):
         cursor = self.connection.cursor()
-
-        # Запрос к базе данных
-        query = """
-                    SELECT c.name, SUM(e.amount) AS total_amount
-                    FROM expenses e
-                    JOIN categories c ON e.category_id = c.id
-                    WHERE e.date >= date(2024)
+        dates = [QDate.currentDate().addDays(-QDate.currentDate().dayOfWeek()), QDate.currentDate().addDays(-QDate.currentDate().day() + 1),
+                 QDate.currentDate().addDays(-QDate.currentDate().day() + 1).addMonths(-QDate.currentDate().month() + 1)]
+        date = dates[self.buttonGroup.checkedId()].toString("dd.MM.yyyy")
+        print(date)
+        query = f"""
+                    SELECT c.name, SUM(amount) AS total_amount
+                    FROM transactions e
+                    JOIN categories c ON category_id = c.id
+                    WHERE date >= "{date}" and is_expense = 1
                     GROUP BY c.name
                     ORDER BY total_amount DESC
                     LIMIT 5;
                 """
         a = cursor.execute(query).fetchall()
-        print(a)
-        # Получаем результаты
         categories = []
         amounts = []
         for row in a:
-            categories.append(row[0])  # имя категории
-            amounts.append(row[1])  # сумма расходов
+            categories.append(row[0])
+            amounts.append(row[1])
 
+        max_amount = max(amounts) if amounts else 1
 
-        # Определение максимальной суммы для масштаба графика
-        max_amount = max(amounts) if amounts else 1  # избегаем деления на 0, если данных нет
-
-        bar_width = 70  # Ширина столбца
-        spacing = 15  # Интервал между столбцами
+        bar_width = 70
+        spacing = 15
 
         max_bar_height = 170
 
         self.scene.clear()
 
         for index, (category, amount) in enumerate(zip(categories, amounts)):
-            # Нормализуем значение для отображения в графике (по отношению к max_amount)
-            bar_height = (amount / max_amount) * max_bar_height  # Высота столбца
+            bar_height = (amount / max_amount) * max_bar_height
 
-            # Создаем прямоугольник для столбца
             rect = self.scene.addRect(
-                index * (bar_width + spacing),  # X-координата
-                max_bar_height - bar_height,  # Y-координата (чтобы столбец был "снизу вверх")
-                bar_width,  # Ширина столбца
-                bar_height,  # Высота столбца
-                brush=QBrush(QColor(100, 150, 255))  # Цвет столбца
+                index * (bar_width + spacing),
+                max_bar_height - bar_height,
+                bar_width,
+                bar_height,
+                brush=QBrush(QColor(100, 150, 255))
             )
 
-            # Создаем текст с названием категории и располагируем его строго под столбцом
             text_item = QGraphicsTextItem(category)
-            text_item.setFont(QFont('Arial', 10))  # Устанавливаем шрифт и размер
-            text_item.setTextWidth(bar_width)  # Ограничиваем ширину текста размером столбца
-            text_item.setPos(index * (bar_width + spacing), max_bar_height + 5) # Позиция текста
+            text_item.setFont(QFont('Arial', 10))
+            text_item.setTextWidth(bar_width)
+            text_item.setPos(index * (bar_width + spacing), max_bar_height + 5)
 
-            amount_text_item = QGraphicsTextItem(f"{amount:.2f}")  # Форматируем число до двух знаков
-            amount_text_item.setFont(QFont('Arial', 10))  # Устанавливаем шрифт
+            amount_text_item = QGraphicsTextItem(f"{amount:.2f}")
+            amount_text_item.setFont(QFont('Arial', 10))
             amount_text_item.setPos(
                 index * (bar_width + spacing) + (bar_width // 2) - (amount_text_item.boundingRect().width() / 2),
-                max_bar_height - bar_height - 20)  # Позиция суммы по центру # Черный цвет для суммы
+                max_bar_height - bar_height - 20)
             self.scene.addItem(amount_text_item)
 
-            # Добавляем текст в сцену
             self.scene.addItem(text_item)
 
-            # Устанавливаем область видимости сцены, чтобы все столбцы были видны
         self.scene.setSceneRect(QRectF(0, 0, len(categories) * (bar_width + spacing), max_bar_height + 50))
 
     def refresh_graph(self):
