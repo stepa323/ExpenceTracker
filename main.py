@@ -106,6 +106,8 @@ ORDER BY
         if widget.exec() == 1:
             values = widget.get_input()
             try:
+                if values[0] == 0:
+                    raise Exception
                 sql = f"""insert into transactions(date, amount, expenses_id, description, is_expense) 
                     values("{values[1]}", {values[0]}, (select id from expenses where name = "{values[2]}"), "{values[3]}", 1)"""
                 self.connection.cursor().execute(sql)
@@ -119,6 +121,8 @@ ORDER BY
         if widget.exec() == 1:
             values = widget.get_input()
             try:
+                if values[0] == 0:
+                    raise Exception
                 sql = f"""insert into transactions(date, amount, incomes_id, description, is_expense) 
                             values("{values[1]}", {values[0]}, (select id from incomes where name = "{values[2]}"), "{values[3]}", 0)"""
                 self.connection.cursor().execute(sql)
