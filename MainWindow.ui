@@ -22,7 +22,7 @@
    <bool>false</bool>
   </property>
   <property name="styleSheet">
-   <string notr="true">)</string>
+   <string notr="true"/>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QWidget" name="layoutWidget">
@@ -125,6 +125,9 @@
       <kerning>true</kerning>
      </font>
     </property>
+    <property name="styleSheet">
+     <string notr="true">color: rgb(0, 0, 0);</string>
+    </property>
     <property name="text">
      <string>FinTracker</string>
     </property>
@@ -132,7 +135,7 @@
      <set>Qt::AlignCenter</set>
     </property>
    </widget>
-   <widget class="QLabel" name="label_3">
+   <widget class="QLabel" name="balanceLabel">
     <property name="geometry">
      <rect>
       <x>150</x>
@@ -150,7 +153,7 @@
      </font>
     </property>
     <property name="text">
-     <string>12.345.600,0₽</string>
+     <string>0</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignCenter</set>
@@ -231,6 +234,23 @@
       </layout>
      </item>
     </layout>
+   </widget>
+   <widget class="QPushButton" name="refreshBtn">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>10</y>
+      <width>75</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">color: rgb(0, 0, 0);
+border-color: rgb(88, 88, 88);</string>
+    </property>
+    <property name="text">
+     <string>Обновить</string>
+    </property>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">

@@ -1,15 +1,14 @@
-from datetime import datetime
 import sys
 
 import sqlite3
 from PyQt6 import uic
 from PyQt6.QtCore import QDate, QTime, QRectF
-from PyQt6.QtGui import QBrush, QColor, QFont
+from PyQt6.QtGui import QBrush, QColor, QFont, QPalette
 from PyQt6.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QDialog, QGraphicsRectItem, QGraphicsScene, \
-    QVBoxLayout, QGraphicsView, QGraphicsTextItem, QButtonGroup
+    QVBoxLayout, QGraphicsView, QGraphicsTextItem, QButtonGroup, QMessageBox, QStyle, QStyleFactory
 
 
-class AddExpenseWidget(QDialog):
+class AddTransactWidget(QDialog):
     def __init__(self, parent, lst):
         super().__init__(parent)
         uic.loadUi('AddExpensesWidget.ui', self)
@@ -20,6 +19,7 @@ class AddExpenseWidget(QDialog):
         self.dateTimeEdit.setTime(QTime.currentTime())
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
+        self.dateTimeEdit.setDisplayFormat("yyyy-MM-dd hh:mm")
 
     def get_input(self):
         return [self.lineEdit.text(), self.dateTimeEdit.text(), self.comboBox.currentText(), self.lineEdit_2.text()]
@@ -30,38 +30,55 @@ class MainWindow(QMainWindow):
         super().__init__()
         uic.loadUi('MainWindow.ui', self)
         self.connection = sqlite3.connect("DB.sqlite")
-        self.categories = [el[0] for el in self.connection.cursor().execute('select name from categories').fetchall()]
+        self.expenses = [el[0] for el in self.connection.cursor().execute('select name from expenses').fetchall()]
+        self.incomes = [el[0] for el in self.connection.cursor().execute('select name from incomes').fetchall()]
+        self.scene = QGraphicsScene(self)
+        self.view.setScene(self.scene)
+
         self.buttonGroup.setId(self.weekBtn, 0)
         self.buttonGroup.setId(self.monthBtn, 1)
         self.buttonGroup.setId(self.yearBtn, 2)
-        self.buttonGroup.buttonToggled.connect(self.plot_expenses)
+        self.monthBtn.setChecked(True)
+        self.buttonGroup.buttonToggled.connect(self.graphic_expenses)
+        self.refreshBtn.clicked.connect(self.refresh)
 
         self.addExpenseBtn.clicked.connect(self.addExpense)
         self.addIncomeBtn.clicked.connect(self.addIncome)
 
-        self.scene = QGraphicsScene(self)
-        self.view.setScene(self.scene)
-        self.plot_expenses()
-        self.select_data()
+        self.refresh()
 
+    def balance(self):
+        sql = 'select SUM(amount) from transactions where is_expense = 1'
+        sql1 = 'select SUM(amount) from transactions where is_expense = 0'
+
+        expense_sum = self.connection.cursor().execute(sql).fetchall()[0][0]
+        if not expense_sum:
+            expense_sum = 0
+        income_sum = self.connection.cursor().execute(sql1).fetchall()[0][0]
+        if not income_sum:
+            income_sum = 0
+        summ = -int(expense_sum) + int(income_sum)
+        self.balanceLabel.setText(f"{str(summ)} ₽")
+        if summ < 0:
+            self.balanceLabel.setStyleSheet('color: rgb(200, 50, 50)')
+        else:
+            self.balanceLabel.setStyleSheet('color: rgb(50, 200, 50)')
 
     def select_data(self):
         query = '''SELECT 
     t.date, 
     t.amount, 
     CASE 
-        WHEN t.is_expense = 1 THEN c.name
+        WHEN t.is_expense = 1 THEN e.name
         ELSE i.name
     END AS category_name, 
     t.description
 FROM 
     transactions t
 LEFT JOIN 
-    categories c ON t.category_id = c.id
+    expenses e ON t.expenses_id = e.id
 LEFT JOIN 
-    income i ON t.category_id = i.id
-WHERE 
-    t.is_expense IN (0, 1)
+    incomes i ON t.incomes_id = i.id
 ORDER BY 
     t.date DESC;'''
         res = self.connection.cursor().execute(query).fetchall()
@@ -71,40 +88,57 @@ ORDER BY
         for i, row in enumerate(res):
             self.tableWidget.setRowCount(
                 self.tableWidget.rowCount() + 1)
+            if row[2] in self.incomes:
+                expense = False
+            else:
+                expense = True
             for j, elem in enumerate(row):
                 self.tableWidget.setItem(
                     i, j, QTableWidgetItem(str(elem)))
+                if expense:
+                    self.tableWidget.item(i, j).setBackground(QColor(200, 50, 50))
+                else:
+                    self.tableWidget.item(i, j).setBackground(QColor(50, 200, 50))
         self.refresh_graph()
 
     def addExpense(self):
-        widget = AddExpenseWidget(self, self.categories)
+        widget = AddTransactWidget(self, self.expenses)
         if widget.exec() == 1:
             values = widget.get_input()
-            if values != 0:
-                sql = f"""insert into transactions(date, amount, category_id, description, is_expense) 
-                    values("{values[1]}", {values[0]}, (select id from categories where name = "{values[2]}"), "{values[3]}", 1)"""
+            try:
+                sql = f"""insert into transactions(date, amount, expenses_id, description, is_expense) 
+                    values("{values[1]}", {values[0]}, (select id from expenses where name = "{values[2]}"), "{values[3]}", 1)"""
                 self.connection.cursor().execute(sql)
                 self.connection.commit()
-                self.select_data()
+                self.refresh()
+            except Exception:
+                self.error('не верно введены значения')
 
     def addIncome(self):
-        ...
+        widget = AddTransactWidget(self, self.incomes)
+        if widget.exec() == 1:
+            values = widget.get_input()
+            try:
+                sql = f"""insert into transactions(date, amount, incomes_id, description, is_expense) 
+                            values("{values[1]}", {values[0]}, (select id from incomes where name = "{values[2]}"), "{values[3]}", 0)"""
+                self.connection.cursor().execute(sql)
+                self.connection.commit()
+                self.refresh()
+            except Exception:
+                self.error('не верно введены значения')
 
-    def tableChanged(self):
-        ...
-
-    def plot_expenses(self):
+    def graphic_expenses(self):
         cursor = self.connection.cursor()
-        dates = [QDate.currentDate().addDays(-QDate.currentDate().dayOfWeek()), QDate.currentDate().addDays(-QDate.currentDate().day() + 1),
-                 QDate.currentDate().addDays(-QDate.currentDate().day() + 1).addMonths(-QDate.currentDate().month() + 1)]
-        date = dates[self.buttonGroup.checkedId()].toString("dd.MM.yyyy")
-        print(date)
-        query = f"""
-                    SELECT c.name, SUM(amount) AS total_amount
-                    FROM transactions e
-                    JOIN categories c ON category_id = c.id
+        dates = [QDate.currentDate().addDays(-QDate.currentDate().dayOfWeek()),
+                 QDate.currentDate().addDays(-QDate.currentDate().day() + 1),
+                 QDate.currentDate().addDays(-QDate.currentDate().day() + 1).addMonths(
+                     -QDate.currentDate().month() + 1)]
+        date = dates[self.buttonGroup.checkedId()].toString("yyyy-MM-dd")
+        query = f"""SELECT e.name, SUM(amount) AS total_amount
+                    FROM transactions t
+                    JOIN expenses e ON t.expenses_id = e.id
                     WHERE date >= "{date}" and is_expense = 1
-                    GROUP BY c.name
+                    GROUP BY e.name
                     ORDER BY total_amount DESC
                     LIMIT 5;
                 """
@@ -151,8 +185,16 @@ ORDER BY
 
         self.scene.setSceneRect(QRectF(0, 0, len(categories) * (bar_width + spacing), max_bar_height + 50))
 
+    def error(self, error):
+        QMessageBox.critical(self, 'Ошибка: ', error)
+
     def refresh_graph(self):
-        self.plot_expenses()
+        self.graphic_expenses()
+
+    def refresh(self):
+        self.graphic_expenses()
+        self.select_data()
+        self.balance()
 
     def closeEvent(self, event):
         self.connection.close()
