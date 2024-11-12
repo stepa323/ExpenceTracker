@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1920</width>
-    <height>1009</height>
+    <height>1080</height>
    </rect>
   </property>
   <property name="font">
@@ -29,12 +29,108 @@
     <property name="geometry">
      <rect>
       <x>130</x>
-      <y>610</y>
+      <y>205</y>
       <width>461</width>
-      <height>246</height>
+      <height>651</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <item>
+        <widget class="QLabel" name="label_4">
+         <property name="font">
+          <font>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Расходы:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="weekBtn">
+         <property name="font">
+          <font>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Неделя</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">buttonGroup</string>
+         </attribute>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="monthBtn">
+         <property name="font">
+          <font>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Месяц</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">buttonGroup</string>
+         </attribute>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="yearBtn">
+         <property name="font">
+          <font>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Год</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">buttonGroup</string>
+         </attribute>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <item>
+        <widget class="QLabel" name="first_date">
+         <property name="text">
+          <string>от:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="last_date">
+         <property name="text">
+          <string>до:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="leftBtn">
+         <property name="text">
+          <string>&lt;</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="rightBtn">
+         <property name="text">
+          <string>&gt;</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QGraphicsView" name="view"/>
+     </item>
      <item>
       <widget class="QLabel" name="label_2">
        <property name="font">
@@ -138,8 +234,8 @@
    <widget class="QLabel" name="balanceLabel">
     <property name="geometry">
      <rect>
-      <x>150</x>
-      <y>170</y>
+      <x>170</x>
+      <y>100</y>
       <width>331</width>
       <height>61</height>
      </rect>
@@ -152,88 +248,15 @@
       <bold>true</bold>
      </font>
     </property>
+    <property name="styleSheet">
+     <string notr="true">color: rgb(200, 50, 50);</string>
+    </property>
     <property name="text">
      <string>0</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignCenter</set>
     </property>
-   </widget>
-   <widget class="QWidget" name="gridLayoutWidget">
-    <property name="geometry">
-     <rect>
-      <x>130</x>
-      <y>310</y>
-      <width>461</width>
-      <height>281</height>
-     </rect>
-    </property>
-    <layout class="QGridLayout" name="gridLayout">
-     <item row="1" column="0">
-      <widget class="QGraphicsView" name="view"/>
-     </item>
-     <item row="0" column="0">
-      <layout class="QHBoxLayout" name="horizontalLayout_3">
-       <item>
-        <widget class="QLabel" name="label_4">
-         <property name="font">
-          <font>
-           <pointsize>10</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>Расходы:</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QRadioButton" name="weekBtn">
-         <property name="font">
-          <font>
-           <pointsize>10</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>Неделя</string>
-         </property>
-         <attribute name="buttonGroup">
-          <string notr="true">buttonGroup</string>
-         </attribute>
-        </widget>
-       </item>
-       <item>
-        <widget class="QRadioButton" name="monthBtn">
-         <property name="font">
-          <font>
-           <pointsize>10</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>Месяц</string>
-         </property>
-         <attribute name="buttonGroup">
-          <string notr="true">buttonGroup</string>
-         </attribute>
-        </widget>
-       </item>
-       <item>
-        <widget class="QRadioButton" name="yearBtn">
-         <property name="font">
-          <font>
-           <pointsize>10</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>Год</string>
-         </property>
-         <attribute name="buttonGroup">
-          <string notr="true">buttonGroup</string>
-         </attribute>
-        </widget>
-       </item>
-      </layout>
-     </item>
-    </layout>
    </widget>
    <widget class="QPushButton" name="refreshBtn">
     <property name="geometry">

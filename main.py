@@ -1,6 +1,8 @@
 import sys
 
 import sqlite3
+from datetime import datetime
+
 from PyQt6 import uic
 from PyQt6.QtCore import QDate, QTime, QRectF
 from PyQt6.QtGui import QBrush, QColor, QFont, QPalette
@@ -19,7 +21,7 @@ class AddTransactWidget(QDialog):
         self.dateTimeEdit.setTime(QTime.currentTime())
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
-        self.dateTimeEdit.setDisplayFormat("yyyy-MM-dd hh:mm")
+        self.dateTimeEdit.setDisplayFormat("dd MMMM yyyy hh:mm")
 
     def get_input(self):
         return [self.lineEdit.text(), self.dateTimeEdit.text(), self.comboBox.currentText(), self.lineEdit_2.text()]
@@ -41,11 +43,26 @@ class MainWindow(QMainWindow):
         self.monthBtn.setChecked(True)
         self.buttonGroup.buttonToggled.connect(self.graphic_expenses)
         self.refreshBtn.clicked.connect(self.refresh)
+        self.leftBtn.setEnabled(False)
+        self.leftBtn.clicked.connect(self.countClicks)
+        self.rightBtn.clicked.connect(self.countClicks)
 
         self.addExpenseBtn.clicked.connect(self.addExpense)
         self.addIncomeBtn.clicked.connect(self.addIncome)
+        self.countclicks = 0
 
         self.refresh()
+
+    def countClicks(self):
+        if self.sender().text() == '>':
+            self.countclicks += 1
+            if self.countclicks == 1:
+                self.leftBtn.setEnabled(True)
+        else:
+            self.countclicks -= 1
+            if self.countclicks == 0:
+                self.leftBtn.setEnabled(False)
+        self.refresh_graph()
 
     def balance(self):
         sql = 'select SUM(amount) from transactions where is_expense = 1'
@@ -93,12 +110,15 @@ ORDER BY
             else:
                 expense = True
             for j, elem in enumerate(row):
+                if j == 0:
+                    date_obj = datetime.strptime(elem, "%Y-%m-%d %H:%M")
+                    elem = date_obj.strftime("%d %B %Y, %H:%M")
                 self.tableWidget.setItem(
                     i, j, QTableWidgetItem(str(elem)))
                 if expense:
-                    self.tableWidget.item(i, j).setBackground(QColor(200, 50, 50))
+                    self.tableWidget.item(i, j).setBackground(QColor(255, 100, 100))
                 else:
-                    self.tableWidget.item(i, j).setBackground(QColor(50, 200, 50))
+                    self.tableWidget.item(i, j).setBackground(QColor(100, 255, 100))
         self.refresh_graph()
 
     def addExpense(self):
@@ -106,7 +126,7 @@ ORDER BY
         if widget.exec() == 1:
             values = widget.get_input()
             try:
-                if values[0] == 0:
+                if values[0] == "0":
                     raise Exception
                 sql = f"""insert into transactions(date, amount, expenses_id, description, is_expense) 
                     values("{values[1]}", {values[0]}, (select id from expenses where name = "{values[2]}"), "{values[3]}", 1)"""
@@ -121,7 +141,7 @@ ORDER BY
         if widget.exec() == 1:
             values = widget.get_input()
             try:
-                if values[0] == 0:
+                if values[0] == "0":
                     raise Exception
                 sql = f"""insert into transactions(date, amount, incomes_id, description, is_expense) 
                             values("{values[1]}", {values[0]}, (select id from incomes where name = "{values[2]}"), "{values[3]}", 0)"""
@@ -133,64 +153,81 @@ ORDER BY
 
     def graphic_expenses(self):
         cursor = self.connection.cursor()
-        dates = [QDate.currentDate().addDays(-QDate.currentDate().dayOfWeek()),
-                 QDate.currentDate().addDays(-QDate.currentDate().day() + 1),
+        id = self.buttonGroup.checkedId()
+
+        dates = [QDate.currentDate().addDays(-QDate.currentDate().dayOfWeek() - 7 * self.countclicks),
+                 QDate.currentDate().addDays(-QDate.currentDate().day() + 1).addMonths(-self.countclicks),
                  QDate.currentDate().addDays(-QDate.currentDate().day() + 1).addMonths(
-                     -QDate.currentDate().month() + 1)]
-        date = dates[self.buttonGroup.checkedId()].toString("yyyy-MM-dd")
+                     -QDate.currentDate().month() + 1).addYears(-self.countclicks)]
+        dates1 = [dates[0].addDays(7), dates[1].addMonths(1), dates[2].addYears(1)]
+
+
+        date1 = dates1[id].toString("yyyy-MM-dd")
+        date = dates[id].toString("yyyy-MM-dd")
+
+        self.first_date.setText(dates[id].toString("dd MMMM yyyy"))
+        self.last_date.setText(dates1[id].toString("dd MMMM yyyy"))
+
         query = f"""SELECT e.name, SUM(amount) AS total_amount
                     FROM transactions t
                     JOIN expenses e ON t.expenses_id = e.id
-                    WHERE date >= "{date}" and is_expense = 1
+                    WHERE date >= "{date}" and date <= "{date1}" and is_expense = 1
                     GROUP BY e.name
                     ORDER BY total_amount DESC
                     LIMIT 5;
                 """
         a = cursor.execute(query).fetchall()
-        categories = []
-        amounts = []
-        for row in a:
-            categories.append(row[0])
-            amounts.append(row[1])
-
-        max_amount = max(amounts) if amounts else 1
-
-        bar_width = 70
-        spacing = 15
-
-        max_bar_height = 170
 
         self.scene.clear()
-
-        for index, (category, amount) in enumerate(zip(categories, amounts)):
-            bar_height = (amount / max_amount) * max_bar_height
-
-            rect = self.scene.addRect(
-                index * (bar_width + spacing),
-                max_bar_height - bar_height,
-                bar_width,
-                bar_height,
-                brush=QBrush(QColor(100, 150, 255))
-            )
-
-            text_item = QGraphicsTextItem(category)
-            text_item.setFont(QFont('Arial', 10))
-            text_item.setTextWidth(bar_width)
-            text_item.setPos(index * (bar_width + spacing), max_bar_height + 5)
-
-            amount_text_item = QGraphicsTextItem(f"{amount:.2f}")
-            amount_text_item.setFont(QFont('Arial', 10))
-            amount_text_item.setPos(
-                index * (bar_width + spacing) + (bar_width // 2) - (amount_text_item.boundingRect().width() / 2),
-                max_bar_height - bar_height - 20)
-            self.scene.addItem(amount_text_item)
-
+        if not a:
+            text_item = QGraphicsTextItem("В этом промежутке не было расходов")
+            text_item.setFont(QFont('Arial', 18))
+            text_item.setTextWidth(150)
+            text_item.setPos(0, 50)
             self.scene.addItem(text_item)
+        else:
+            categories = []
+            amounts = []
+            for row in a:
+                categories.append(row[0])
+                amounts.append(row[1])
 
-        self.scene.setSceneRect(QRectF(0, 0, len(categories) * (bar_width + spacing), max_bar_height + 50))
+            max_amount = max(amounts) if amounts else 1
+
+            bar_width = 70
+            spacing = 15
+
+            max_bar_height = 170
+
+            for index, (category, amount) in enumerate(zip(categories, amounts)):
+                bar_height = (amount / max_amount) * max_bar_height
+
+                rect = self.scene.addRect(
+                    index * (bar_width + spacing),
+                    max_bar_height - bar_height,
+                    bar_width,
+                    bar_height,
+                    brush=QBrush(QColor(150, 150, 255))
+                )
+
+                text_item = QGraphicsTextItem(category)
+                text_item.setFont(QFont('Arial', 10))
+                text_item.setTextWidth(bar_width)
+                text_item.setPos(index * (bar_width + spacing), max_bar_height + 5)
+
+                amount_text_item = QGraphicsTextItem(f"{amount:.2f}")
+                amount_text_item.setFont(QFont('Arial', 10))
+                amount_text_item.setPos(
+                    index * (bar_width + spacing) + (bar_width // 2) - (amount_text_item.boundingRect().width() / 2),
+                    max_bar_height - bar_height - 20)
+                self.scene.addItem(amount_text_item)
+
+                self.scene.addItem(text_item)
+
+            self.scene.setSceneRect(QRectF(0, 0, len(categories) * (bar_width + spacing), max_bar_height + 50))
 
     def error(self, error):
-        QMessageBox.critical(self, 'Ошибка: ', error)
+        QMessageBox.critical(self, 'Ошибка', error)
 
     def refresh_graph(self):
         self.graphic_expenses()

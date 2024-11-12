@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>264</width>
+    <width>335</width>
     <height>235</height>
    </rect>
   </property>
@@ -29,12 +29,12 @@
     <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>30</x>
+     <x>10</x>
      <y>30</y>
-     <width>221</width>
+     <width>311</width>
      <height>151</height>
     </rect>
    </property>
