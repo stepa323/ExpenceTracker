@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime
 
 from PyQt6 import uic
-from PyQt6.QtCore import QDate, QTime, QRectF
+from PyQt6.QtCore import QDate, QTime, QRectF, QTimer, QDateTime
 from PyQt6.QtGui import QBrush, QColor, QFont
 from PyQt6.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QDialog, QGraphicsScene, \
      QGraphicsTextItem, QMessageBox
@@ -31,15 +31,21 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         uic.loadUi('MainWindow.ui', self)
+
+        self.countclicks = 0
+        self.scene = QGraphicsScene(self)
         self.connection = sqlite3.connect("DB.sqlite")
         self.expenses = [el[0] for el in self.connection.cursor().execute('select name from expenses').fetchall()]
         self.incomes = [el[0] for el in self.connection.cursor().execute('select name from incomes').fetchall()]
-        self.scene = QGraphicsScene(self)
+        self.initUi()
+
+    def initUi(self):
         self.view.setScene(self.scene)
 
         self.buttonGroup.setId(self.weekBtn, 0)
         self.buttonGroup.setId(self.monthBtn, 1)
         self.buttonGroup.setId(self.yearBtn, 2)
+
         self.monthBtn.setChecked(True)
         self.buttonGroup.buttonToggled.connect(self.graphic_expenses)
         self.refreshBtn.clicked.connect(self.refresh)
@@ -49,9 +55,19 @@ class MainWindow(QMainWindow):
 
         self.addExpenseBtn.clicked.connect(self.addExpense)
         self.addIncomeBtn.clicked.connect(self.addIncome)
-        self.countclicks = 0
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_date_time)
+        self.timer.start(1000)
 
         self.refresh()
+
+    def update_date_time(self):
+        date_time = QDateTime.currentDateTime()
+        date = date_time.toString("d MMMM yyyy")
+        time = date_time.toString("HH:mm:ss")
+        self.time.setText(time)
+        self.date.setText(date)
 
     def countClicks(self):
         if self.sender().text() == '>':
