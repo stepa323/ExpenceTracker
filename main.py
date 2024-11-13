@@ -5,15 +5,15 @@ from datetime import datetime
 
 from PyQt6 import uic
 from PyQt6.QtCore import QDate, QTime, QRectF
-from PyQt6.QtGui import QBrush, QColor, QFont, QPalette
-from PyQt6.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QDialog, QGraphicsRectItem, QGraphicsScene, \
-    QVBoxLayout, QGraphicsView, QGraphicsTextItem, QButtonGroup, QMessageBox, QStyle, QStyleFactory
+from PyQt6.QtGui import QBrush, QColor, QFont
+from PyQt6.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QDialog, QGraphicsScene, \
+     QGraphicsTextItem, QMessageBox
 
 
 class AddTransactWidget(QDialog):
     def __init__(self, parent, lst):
         super().__init__(parent)
-        uic.loadUi('AddExpensesWidget.ui', self)
+        uic.loadUi('AddTransactionWidget.ui', self)
         self.comboBox.addItems(lst)
         self.dateTimeEdit.setMinimumDate(QDate.currentDate().addDays(-365 * 5))
         self.dateTimeEdit.setMaximumDate(QDate.currentDate())
@@ -77,14 +77,23 @@ class MainWindow(QMainWindow):
         summ = -int(expense_sum) + int(income_sum)
         self.balanceLabel.setText(f"{str(summ)} ₽")
         if summ < 0:
-            self.balanceLabel.setStyleSheet('color: rgb(200, 50, 50)')
+            self.balanceLabel.setStyleSheet('color: rgb(150, 50, 50)')
         else:
-            self.balanceLabel.setStyleSheet('color: rgb(50, 200, 50)')
+            self.balanceLabel.setStyleSheet('color: rgb(50, 150, 50)')
+
+    def amount_expenses(self, date, date1):
+        sql = f'''select SUM(amount) from transactions where is_expense = 1 and date >= "{date}" and date <= "{date1}"'''
+
+        expense_sum = self.connection.cursor().execute(sql).fetchall()[0][0]
+        if not expense_sum:
+            expense_sum = 0
+        summ = int(expense_sum)
+        self.amountExpenses.setText(f"{str(summ)} ₽")
 
     def select_data(self):
         query = '''SELECT 
-    t.date, 
     t.amount, 
+    t.date, 
     CASE 
         WHEN t.is_expense = 1 THEN e.name
         ELSE i.name
@@ -98,6 +107,7 @@ LEFT JOIN
     incomes i ON t.incomes_id = i.id
 ORDER BY 
     t.date DESC;'''
+
         res = self.connection.cursor().execute(query).fetchall()
         self.tableWidget.setColumnCount(4)
         self.tableWidget.setRowCount(0)
@@ -110,15 +120,28 @@ ORDER BY
             else:
                 expense = True
             for j, elem in enumerate(row):
-                if j == 0:
-                    date_obj = datetime.strptime(elem, "%Y-%m-%d %H:%M")
-                    elem = date_obj.strftime("%d %B %Y, %H:%M")
-                self.tableWidget.setItem(
-                    i, j, QTableWidgetItem(str(elem)))
-                if expense:
-                    self.tableWidget.item(i, j).setBackground(QColor(255, 100, 100))
+                if j == 0 and expense:
+                    elem = f"-{elem}"
+                    self.tableWidget.setItem(
+                        i, j, QTableWidgetItem(str(elem)))
+                    self.tableWidget.item(i, j).setForeground(QColor(100, 0, 0))
+                elif j == 0 and not expense:
+                    elem = f'+{elem}'
+                    self.tableWidget.setItem(
+                        i, j, QTableWidgetItem(str(elem)))
+                    self.tableWidget.item(i, j).setForeground(QColor(0, 100, 0))
                 else:
-                    self.tableWidget.item(i, j).setBackground(QColor(100, 255, 100))
+                    if j == 1:
+                        date_obj = datetime.strptime(elem, "%Y-%m-%d %H:%M")
+                        elem = date_obj.strftime("%d %b %Y, %H:%M")
+                    self.tableWidget.setItem(
+                        i, j, QTableWidgetItem(str(elem)))
+
+        self.tableWidget.setColumnWidth(0, 80)
+        self.tableWidget.setColumnWidth(1, 125)
+        self.tableWidget.setColumnWidth(2, 130)
+        self.tableWidget.setColumnWidth(3, 150)
+
         self.refresh_graph()
 
     def addExpense(self):
@@ -161,12 +184,11 @@ ORDER BY
                      -QDate.currentDate().month() + 1).addYears(-self.countclicks)]
         dates1 = [dates[0].addDays(7), dates[1].addMonths(1), dates[2].addYears(1)]
 
-
         date1 = dates1[id].toString("yyyy-MM-dd")
         date = dates[id].toString("yyyy-MM-dd")
 
-        self.first_date.setText(dates[id].toString("dd MMMM yyyy"))
-        self.last_date.setText(dates1[id].toString("dd MMMM yyyy"))
+        self.first_date.setText(f"от {dates[id].toString("d MMM yyyy")}")
+        self.last_date.setText(f"до {dates1[id].toString("d MMM yyyy")}")
 
         query = f"""SELECT e.name, SUM(amount) AS total_amount
                     FROM transactions t
@@ -176,8 +198,9 @@ ORDER BY
                     ORDER BY total_amount DESC
                     LIMIT 5;
                 """
+        self.amount_expenses(date, date1)
+        self.select_graphics_transactions(date, date1)
         a = cursor.execute(query).fetchall()
-
         self.scene.clear()
         if not a:
             text_item = QGraphicsTextItem("В этом промежутке не было расходов")
@@ -225,6 +248,58 @@ ORDER BY
                 self.scene.addItem(text_item)
 
             self.scene.setSceneRect(QRectF(0, 0, len(categories) * (bar_width + spacing), max_bar_height + 50))
+
+    def select_graphics_transactions(self, date, date1):
+        query = f'''SELECT 
+    t.amount, 
+    t.date, 
+    CASE 
+        WHEN t.is_expense = 1 THEN e.name
+        ELSE i.name
+    END AS category_name, 
+    t.description
+FROM 
+    transactions t
+LEFT JOIN 
+    expenses e ON t.expenses_id = e.id
+LEFT JOIN 
+    incomes i ON t.incomes_id = i.id
+    WHERE date >= "{date}" and date <= "{date1}"
+ORDER BY 
+    t.date DESC;'''
+        res = self.connection.cursor().execute(query).fetchall()
+        self.tableWidget2.setColumnCount(4)
+        self.tableWidget2.setRowCount(0)
+
+        for i, row in enumerate(res):
+            self.tableWidget2.setRowCount(
+                self.tableWidget2.rowCount() + 1)
+            if row[2] in self.incomes:
+                expense = False
+            else:
+                expense = True
+            for j, elem in enumerate(row):
+                if j == 0 and expense:
+                    elem = f"-{elem}"
+                    self.tableWidget2.setItem(
+                        i, j, QTableWidgetItem(str(elem)))
+                    self.tableWidget2.item(i, j).setForeground(QColor(100, 0, 0))
+                elif j == 0 and not expense:
+                    elem = f'+{elem}'
+                    self.tableWidget2.setItem(
+                        i, j, QTableWidgetItem(str(elem)))
+                    self.tableWidget2.item(i, j).setForeground(QColor(0, 100, 0))
+                else:
+                    if j == 1:
+                        date_obj = datetime.strptime(elem, "%Y-%m-%d %H:%M")
+                        elem = date_obj.strftime("%d %b %Y, %H:%M")
+                    self.tableWidget2.setItem(
+                        i, j, QTableWidgetItem(str(elem)))
+
+        self.tableWidget2.setColumnWidth(0, 80)
+        self.tableWidget2.setColumnWidth(1, 125)
+        self.tableWidget2.setColumnWidth(2, 130)
+        self.tableWidget2.setColumnWidth(3, 150)
 
     def error(self, error):
         QMessageBox.critical(self, 'Ошибка', error)
