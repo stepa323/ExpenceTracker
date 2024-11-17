@@ -1,3 +1,4 @@
+import csv
 import sys
 
 import sqlite3
@@ -7,7 +8,7 @@ from PyQt6 import uic
 from PyQt6.QtCore import QDate, QTime, QRectF, QTimer, QDateTime
 from PyQt6.QtGui import QBrush, QColor, QFont
 from PyQt6.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QDialog, QGraphicsScene, \
-     QGraphicsTextItem, QMessageBox
+    QGraphicsTextItem, QMessageBox, QFileDialog
 
 
 class AddTransactWidget(QDialog):
@@ -21,7 +22,7 @@ class AddTransactWidget(QDialog):
         self.dateTimeEdit.setTime(QTime.currentTime())
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
-        self.dateTimeEdit.setDisplayFormat("dd MMMM yyyy hh:mm")
+        self.dateTimeEdit.setDisplayFormat("dd MM yyyy hh:mm")
 
     def get_input(self):
         return [self.lineEdit.text(), self.dateTimeEdit.text(), self.comboBox.currentText(), self.lineEdit_2.text()]
@@ -52,15 +53,67 @@ class MainWindow(QMainWindow):
         self.leftBtn.setEnabled(False)
         self.leftBtn.clicked.connect(self.countClicks)
         self.rightBtn.clicked.connect(self.countClicks)
-
+        self.deleteBtn.clicked.connect(self.deleteTran)
         self.addExpenseBtn.clicked.connect(self.addExpense)
         self.addIncomeBtn.clicked.connect(self.addIncome)
+        self.saveBtn.clicked.connect(self.save_to_csv)
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_date_time)
         self.timer.start(1000)
 
         self.refresh()
+
+    def save_to_csv(self):
+        fileName, _ = QFileDialog.getSaveFileName(self, "Сохранить файл", "", "CSV Files (*.csv);;All Files (*)")
+
+        if fileName:
+            # Открываем файл для записи
+            with open(fileName, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+
+                # Проходим по всем строкам таблицы
+                for row in range(self.tableWidget.rowCount()):
+                    row_data = []
+                    for col in range(self.tableWidget.columnCount()):
+                        item = self.tableWidget.item(row, col)
+                        row_data.append(item.text() if item else "")
+
+                    # Записываем строку в CSV файл
+                    writer.writerow(row_data)
+            print("Данные сохранены в", fileName)
+
+
+    def deleteTran(self):
+        selected_row = self.tableWidget.currentRow()
+
+        if selected_row == -1:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите запись для удаления.")
+            return
+
+        item = self.tableWidget.item(selected_row, 4)
+        record_id = item.text()
+        cursor = self.connection.cursor()
+        sql = "select amount, date from transactions where id = ?"
+        a = cursor.execute(sql, (record_id,)).fetchall()
+        amount, date = a[0]
+
+        reply = QMessageBox.question(self, 'Подтверждение удаления',
+                                     f"Вы действительно хотите удалить транзакцию ID: {record_id}; сумма: {amount}; дата: {date}",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No)
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                cursor.execute("DELETE FROM transactions WHERE id = ?", (record_id, ))
+                self.connection.commit()
+
+                self.tableWidget.removeRow(selected_row)
+
+                QMessageBox.information(self, "Успех", f"Запись с ID {record_id} удалена.")
+                self.refresh()
+            except Exception as e:
+                self.error(f"Не удалось удалить запись: {str(e)}")
 
     def update_date_time(self):
         date_time = QDateTime.currentDateTime()
@@ -114,7 +167,8 @@ class MainWindow(QMainWindow):
         WHEN t.is_expense = 1 THEN e.name
         ELSE i.name
     END AS category_name, 
-    t.description
+    t.description,
+    t.id
 FROM 
     transactions t
 LEFT JOIN 
@@ -125,7 +179,7 @@ ORDER BY
     t.date DESC;'''
 
         res = self.connection.cursor().execute(query).fetchall()
-        self.tableWidget.setColumnCount(4)
+        self.tableWidget.setColumnCount(5)
         self.tableWidget.setRowCount(0)
 
         for i, row in enumerate(res):
@@ -166,14 +220,19 @@ ORDER BY
             values = widget.get_input()
             try:
                 if values[0] == "0":
-                    raise Exception
+                    raise ValueError
+                date_obj = datetime.strptime(values[1], "%d %m %Y %H:%M")
+                values[1] = date_obj.strftime("%Y-%m-%d %H:%M")
                 sql = f"""insert into transactions(date, amount, expenses_id, description, is_expense) 
                     values("{values[1]}", {values[0]}, (select id from expenses where name = "{values[2]}"), "{values[3]}", 1)"""
                 self.connection.cursor().execute(sql)
+            except ValueError:
+                self.error(f"Не удалось записать данные: сумма не может быть нулевой")
+            except Exception as e:
+                self.error(f"Не удалось записать данные: {str(e)}")
+            else:
                 self.connection.commit()
                 self.refresh()
-            except Exception:
-                self.error('не верно введены значения')
 
     def addIncome(self):
         widget = AddTransactWidget(self, self.incomes)
@@ -182,13 +241,16 @@ ORDER BY
             try:
                 if values[0] == "0":
                     raise Exception
+                date_obj = datetime.strptime(values[1], "%d %m %Y %H:%M")
+                values[1] = date_obj.strftime("%Y-%m-%d %H:%M")
                 sql = f"""insert into transactions(date, amount, incomes_id, description, is_expense) 
                             values("{values[1]}", {values[0]}, (select id from incomes where name = "{values[2]}"), "{values[3]}", 0)"""
                 self.connection.cursor().execute(sql)
-                self.connection.commit()
-                self.refresh()
             except Exception:
                 self.error('не верно введены значения')
+            else:
+                self.connection.commit()
+                self.refresh()
 
     def graphic_expenses(self):
         cursor = self.connection.cursor()
@@ -273,7 +335,8 @@ ORDER BY
         WHEN t.is_expense = 1 THEN e.name
         ELSE i.name
     END AS category_name, 
-    t.description
+    t.description,
+    t.id
 FROM 
     transactions t
 LEFT JOIN 
@@ -283,8 +346,9 @@ LEFT JOIN
     WHERE date >= "{date}" and date <= "{date1}"
 ORDER BY 
     t.date DESC;'''
+
         res = self.connection.cursor().execute(query).fetchall()
-        self.tableWidget2.setColumnCount(4)
+        self.tableWidget2.setColumnCount(5)
         self.tableWidget2.setRowCount(0)
 
         for i, row in enumerate(res):

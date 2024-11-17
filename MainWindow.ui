@@ -174,6 +174,11 @@
          <string>Описание</string>
         </property>
        </column>
+       <column>
+        <property name="text">
+         <string>ID</string>
+        </property>
+       </column>
       </widget>
      </item>
     </layout>
@@ -259,7 +264,7 @@ border-color: rgb(88, 88, 88);</string>
       <x>1330</x>
       <y>200</y>
       <width>461</width>
-      <height>351</height>
+      <height>451</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -300,6 +305,11 @@ border-color: rgb(88, 88, 88);</string>
          <string>Описание</string>
         </property>
        </column>
+       <column>
+        <property name="text">
+         <string>ID</string>
+        </property>
+       </column>
       </widget>
      </item>
      <item>
@@ -330,9 +340,23 @@ border-color: rgb(88, 88, 88);</string>
        </item>
       </layout>
      </item>
+     <item>
+      <widget class="QPushButton" name="deleteBtn">
+       <property name="text">
+        <string>Удалить</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="saveBtn">
+       <property name="text">
+        <string>Сохранить таблицу в формате csv</string>
+       </property>
+      </widget>
+     </item>
     </layout>
    </widget>
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>1500</x>
