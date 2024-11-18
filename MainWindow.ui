@@ -28,8 +28,8 @@
    <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
-      <x>1410</x>
-      <y>190</y>
+      <x>1250</x>
+      <y>160</y>
       <width>461</width>
       <height>721</height>
      </rect>
@@ -250,8 +250,8 @@ border-color: rgb(88, 88, 88);</string>
    <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
-      <x>90</x>
-      <y>360</y>
+      <x>210</x>
+      <y>370</y>
       <width>501</width>
       <height>451</height>
      </rect>
@@ -353,7 +353,7 @@ border-color: rgb(88, 88, 88);</string>
    <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
-      <x>1500</x>
+      <x>1350</x>
       <y>10</y>
       <width>271</width>
       <height>56</height>
@@ -389,8 +389,8 @@ border-color: rgb(88, 88, 88);</string>
    <widget class="QFrame" name="frame">
     <property name="geometry">
      <rect>
-      <x>200</x>
-      <y>130</y>
+      <x>320</x>
+      <y>140</y>
       <width>291</width>
       <height>80</height>
      </rect>

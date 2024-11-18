@@ -190,7 +190,7 @@ class MainWindow(QMainWindow):
 
         res = self.connection.cursor().execute(query).fetchall()
 
-        self.tableWidget.setColumnCount(7)
+        self.tableWidget.setColumnCount(6)
         self.tableWidget.setRowCount(len(res))
 
         expense_color = QColor(100, 0, 0)
@@ -198,9 +198,9 @@ class MainWindow(QMainWindow):
 
         for i, row in enumerate(res):
             expense = row[2] not in self.incomes
-
-            image_path = row[5] if len(row) > 5 else None
-            image_data = row[6] if len(row) > 6 else None
+            print(row)
+            image_path = row[5]
+            image_data = row[6]
 
             if image_path:
                 pixmap = QPixmap(image_path)
@@ -243,9 +243,6 @@ class MainWindow(QMainWindow):
                     item.setText(str(elem))
 
                 self.tableWidget.setItem(i, j + 1, item)
-
-            item = QTableWidgetItem(str(row[4]))
-            self.tableWidget.setItem(i, 6, item)
 
         self.tableWidget.setColumnWidth(0, 60)
         self.tableWidget.setColumnWidth(1, 80)
