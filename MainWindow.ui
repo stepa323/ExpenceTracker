@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1920</width>
+    <width>1923</width>
     <height>1080</height>
    </rect>
   </property>
@@ -28,13 +28,55 @@
    <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
-      <x>130</x>
-      <y>135</y>
+      <x>1410</x>
+      <y>190</y>
       <width>461</width>
       <height>721</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_5">
+       <item>
+        <widget class="QRadioButton" name="expenseRadioBtn">
+         <property name="text">
+          <string>Траты</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">buttonGroup_graphic</string>
+         </attribute>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="incomeRadioBtn">
+         <property name="text">
+          <string>Пополнения</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">buttonGroup_graphic</string>
+         </attribute>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_4">
+       <item>
+        <widget class="QLabel" name="first_date">
+         <property name="text">
+          <string>от:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="last_date">
+         <property name="text">
+          <string>до:</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
      <item>
       <widget class="QLabel" name="amountExpenses">
        <property name="font">
@@ -58,18 +100,6 @@
      </item>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_3">
-       <item>
-        <widget class="QLabel" name="label_4">
-         <property name="font">
-          <font>
-           <pointsize>10</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>Расходы:</string>
-         </property>
-        </widget>
-       </item>
        <item>
         <widget class="QRadioButton" name="weekBtn">
          <property name="font">
@@ -119,20 +149,6 @@
      </item>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_2">
-       <item>
-        <widget class="QLabel" name="first_date">
-         <property name="text">
-          <string>от:</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="last_date">
-         <property name="text">
-          <string>до:</string>
-         </property>
-        </widget>
-       </item>
        <item>
         <widget class="QPushButton" name="leftBtn">
          <property name="text">
@@ -214,33 +230,6 @@
      <set>Qt::AlignCenter</set>
     </property>
    </widget>
-   <widget class="QLabel" name="balanceLabel">
-    <property name="geometry">
-     <rect>
-      <x>730</x>
-      <y>130</y>
-      <width>331</width>
-      <height>61</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <family>Segoe UI Black</family>
-      <pointsize>30</pointsize>
-      <weight>75</weight>
-      <bold>true</bold>
-     </font>
-    </property>
-    <property name="styleSheet">
-     <string notr="true">color: rgb(200, 50, 50);</string>
-    </property>
-    <property name="text">
-     <string>0</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-   </widget>
    <widget class="QPushButton" name="refreshBtn">
     <property name="geometry">
      <rect>
@@ -261,9 +250,9 @@ border-color: rgb(88, 88, 88);</string>
    <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
-      <x>1330</x>
-      <y>200</y>
-      <width>461</width>
+      <x>90</x>
+      <y>360</y>
+      <width>501</width>
       <height>451</height>
      </rect>
     </property>
@@ -285,6 +274,11 @@ border-color: rgb(88, 88, 88);</string>
      </item>
      <item>
       <widget class="QTableWidget" name="tableWidget">
+       <column>
+        <property name="text">
+         <string>Картинка</string>
+        </property>
+       </column>
        <column>
         <property name="text">
          <string>Сумма</string>
@@ -392,13 +386,57 @@ border-color: rgb(88, 88, 88);</string>
      </item>
     </layout>
    </widget>
+   <widget class="QFrame" name="frame">
+    <property name="geometry">
+     <rect>
+      <x>200</x>
+      <y>130</y>
+      <width>291</width>
+      <height>80</height>
+     </rect>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+    <widget class="QLabel" name="balanceLabel">
+     <property name="geometry">
+      <rect>
+       <x>-20</x>
+       <y>10</y>
+       <width>331</width>
+       <height>61</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Segoe UI Black</family>
+       <pointsize>30</pointsize>
+       <weight>75</weight>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">color: rgb(200, 50, 50);
+background-color: rgb(186, 186, 186);</string>
+     </property>
+     <property name="text">
+      <string>0</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1920</width>
+     <width>1923</width>
      <height>21</height>
     </rect>
    </property>
@@ -409,5 +447,6 @@ border-color: rgb(88, 88, 88);</string>
  <connections/>
  <buttongroups>
   <buttongroup name="buttonGroup"/>
+  <buttongroup name="buttonGroup_graphic"/>
  </buttongroups>
 </ui>

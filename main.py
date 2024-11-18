@@ -1,12 +1,13 @@
 import csv
+import io
 import sys
 
 import sqlite3
 from datetime import datetime
 
 from PyQt6 import uic
-from PyQt6.QtCore import QDate, QTime, QRectF, QTimer, QDateTime
-from PyQt6.QtGui import QBrush, QColor, QFont
+from PyQt6.QtCore import QDate, QTime, QRectF, QTimer, QDateTime, Qt
+from PyQt6.QtGui import QBrush, QColor, QFont, QPixmap, QIcon
 from PyQt6.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QDialog, QGraphicsScene, \
     QGraphicsTextItem, QMessageBox, QFileDialog
 
@@ -14,6 +15,7 @@ from PyQt6.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QDialog
 class AddTransactWidget(QDialog):
     def __init__(self, parent, lst):
         super().__init__(parent)
+        self.file_path = None
         uic.loadUi('AddTransactionWidget.ui', self)
         self.comboBox.addItems(lst)
         self.dateTimeEdit.setMinimumDate(QDate.currentDate().addDays(-365 * 5))
@@ -23,9 +25,17 @@ class AddTransactWidget(QDialog):
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         self.dateTimeEdit.setDisplayFormat("dd MM yyyy hh:mm")
+        self.addImage.clicked.connect(self.load_image)
+
+    def load_image(self):
+        file_dialog = QFileDialog(self)
+        file_dialog.setNameFilter('Images (*.png *.jpg *.jpeg *.bmp *.gif)')
+        self.file_path, _ = file_dialog.getOpenFileName(self, "Выберите изображение")
+        self.image_loaded.setText(f"{self.file_path.split('/')[-1]} {self.file_path}")
 
     def get_input(self):
-        return [self.lineEdit.text(), self.dateTimeEdit.text(), self.comboBox.currentText(), self.lineEdit_2.text()]
+        return [self.lineEdit.text(), self.dateTimeEdit.text(), self.comboBox.currentText(), self.lineEdit_2.text(),
+                self.file_path]
 
 
 class MainWindow(QMainWindow):
@@ -46,9 +56,12 @@ class MainWindow(QMainWindow):
         self.buttonGroup.setId(self.weekBtn, 0)
         self.buttonGroup.setId(self.monthBtn, 1)
         self.buttonGroup.setId(self.yearBtn, 2)
-
+        self.buttonGroup_graphic.setId(self.expenseRadioBtn, 0)
+        self.buttonGroup_graphic.setId(self.incomeRadioBtn, 1)
         self.monthBtn.setChecked(True)
+        self.expenseRadioBtn.setChecked(True)
         self.buttonGroup.buttonToggled.connect(self.graphic_expenses)
+        self.buttonGroup_graphic.buttonToggled.connect(self.graphic_expenses)
         self.refreshBtn.clicked.connect(self.refresh)
         self.leftBtn.setEnabled(False)
         self.leftBtn.clicked.connect(self.countClicks)
@@ -68,21 +81,16 @@ class MainWindow(QMainWindow):
         fileName, _ = QFileDialog.getSaveFileName(self, "Сохранить файл", "", "CSV Files (*.csv);;All Files (*)")
 
         if fileName:
-            # Открываем файл для записи
             with open(fileName, mode='w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
-
-                # Проходим по всем строкам таблицы
                 for row in range(self.tableWidget.rowCount()):
                     row_data = []
                     for col in range(self.tableWidget.columnCount()):
                         item = self.tableWidget.item(row, col)
                         row_data.append(item.text() if item else "")
 
-                    # Записываем строку в CSV файл
                     writer.writerow(row_data)
             print("Данные сохранены в", fileName)
-
 
     def deleteTran(self):
         selected_row = self.tableWidget.currentRow()
@@ -91,7 +99,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите запись для удаления.")
             return
 
-        item = self.tableWidget.item(selected_row, 4)
+        item = self.tableWidget.item(selected_row, 5)
         record_id = item.text()
         cursor = self.connection.cursor()
         sql = "select amount, date from transactions where id = ?"
@@ -105,7 +113,7 @@ class MainWindow(QMainWindow):
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                cursor.execute("DELETE FROM transactions WHERE id = ?", (record_id, ))
+                cursor.execute("DELETE FROM transactions WHERE id = ?", (record_id,))
                 self.connection.commit()
 
                 self.tableWidget.removeRow(selected_row)
@@ -146,12 +154,12 @@ class MainWindow(QMainWindow):
         summ = -int(expense_sum) + int(income_sum)
         self.balanceLabel.setText(f"{str(summ)} ₽")
         if summ < 0:
-            self.balanceLabel.setStyleSheet('color: rgb(150, 50, 50)')
+            self.balanceLabel.setStyleSheet('color: rgb(100, 0, 0)')
         else:
-            self.balanceLabel.setStyleSheet('color: rgb(50, 150, 50)')
+            self.balanceLabel.setStyleSheet('color: rgb(0, 100, 0)')
 
-    def amount_expenses(self, date, date1):
-        sql = f'''select SUM(amount) from transactions where is_expense = 1 and date >= "{date}" and date <= "{date1}"'''
+    def amount_expenses(self, date, date1, is_expense):
+        sql = f'''select SUM(amount) from transactions where is_expense = {1 if is_expense else 0} and date >= "{date}" and date <= "{date1}"'''
 
         expense_sum = self.connection.cursor().execute(sql).fetchall()[0][0]
         if not expense_sum:
@@ -161,56 +169,90 @@ class MainWindow(QMainWindow):
 
     def select_data(self):
         query = '''SELECT 
-    t.amount, 
-    t.date, 
-    CASE 
-        WHEN t.is_expense = 1 THEN e.name
-        ELSE i.name
-    END AS category_name, 
-    t.description,
-    t.id
-FROM 
-    transactions t
-LEFT JOIN 
-    expenses e ON t.expenses_id = e.id
-LEFT JOIN 
-    incomes i ON t.incomes_id = i.id
-ORDER BY 
-    t.date DESC;'''
+            t.amount, 
+            t.date, 
+            CASE 
+                WHEN t.is_expense = 1 THEN e.name
+                ELSE i.name
+            END AS category_name, 
+            t.description,
+            t.id,
+            t.image_path, 
+            t.image_data
+        FROM 
+            transactions t
+        LEFT JOIN 
+            expenses e ON t.expenses_id = e.id
+        LEFT JOIN 
+            incomes i ON t.incomes_id = i.id
+        ORDER BY 
+            t.date DESC;'''
 
         res = self.connection.cursor().execute(query).fetchall()
-        self.tableWidget.setColumnCount(5)
-        self.tableWidget.setRowCount(0)
+
+        self.tableWidget.setColumnCount(7)
+        self.tableWidget.setRowCount(len(res))
+
+        expense_color = QColor(100, 0, 0)
+        income_color = QColor(0, 100, 0)
 
         for i, row in enumerate(res):
-            self.tableWidget.setRowCount(
-                self.tableWidget.rowCount() + 1)
-            if row[2] in self.incomes:
-                expense = False
-            else:
-                expense = True
-            for j, elem in enumerate(row):
-                if j == 0 and expense:
-                    elem = f"-{elem}"
-                    self.tableWidget.setItem(
-                        i, j, QTableWidgetItem(str(elem)))
-                    self.tableWidget.item(i, j).setForeground(QColor(100, 0, 0))
-                elif j == 0 and not expense:
-                    elem = f'+{elem}'
-                    self.tableWidget.setItem(
-                        i, j, QTableWidgetItem(str(elem)))
-                    self.tableWidget.item(i, j).setForeground(QColor(0, 100, 0))
-                else:
-                    if j == 1:
+            expense = row[2] not in self.incomes
+
+            image_path = row[5] if len(row) > 5 else None
+            image_data = row[6] if len(row) > 6 else None
+
+            if image_path:
+                pixmap = QPixmap(image_path)
+                if not pixmap.isNull():
+                    icon = QIcon(pixmap.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio))
+                    item = QTableWidgetItem()
+                    item.setIcon(icon)
+                    self.tableWidget.setItem(i, 0, item)
+            elif image_data:
+                image_stream = io.BytesIO(image_data)
+                pixmap = QPixmap()
+                pixmap.loadFromData(image_stream.read())
+                if not pixmap.isNull():
+                    icon = QIcon(pixmap.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio))
+                    item = QTableWidgetItem()
+                    item.setIcon(icon)
+                    self.tableWidget.setItem(i, 0, item)
+
+            for j, elem in enumerate(row[:-2]):
+                item = QTableWidgetItem(str(elem))
+
+                if j == 0:
+                    if expense:
+                        elem = f"-{elem}"
+                        item.setForeground(expense_color)
+                    else:
+                        elem = f"+{elem}"
+                        item.setForeground(income_color)
+                    item.setText(str(elem))
+
+                elif j == 1:
+                    try:
                         date_obj = datetime.strptime(elem, "%Y-%m-%d %H:%M")
                         elem = date_obj.strftime("%d %b %Y, %H:%M")
-                    self.tableWidget.setItem(
-                        i, j, QTableWidgetItem(str(elem)))
+                        item.setText(str(elem))
+                    except ValueError:
+                        item.setText(str(elem))
 
-        self.tableWidget.setColumnWidth(0, 80)
-        self.tableWidget.setColumnWidth(1, 125)
-        self.tableWidget.setColumnWidth(2, 130)
-        self.tableWidget.setColumnWidth(3, 150)
+                else:
+                    item.setText(str(elem))
+
+                self.tableWidget.setItem(i, j + 1, item)
+
+            item = QTableWidgetItem(str(row[4]))
+            self.tableWidget.setItem(i, 6, item)
+
+        self.tableWidget.setColumnWidth(0, 60)
+        self.tableWidget.setColumnWidth(1, 80)
+        self.tableWidget.setColumnWidth(2, 125)
+        self.tableWidget.setColumnWidth(3, 130)
+        self.tableWidget.setColumnWidth(4, 150)
+        self.tableWidget.setColumnWidth(5, 60)
 
         self.refresh_graph()
 
@@ -218,14 +260,30 @@ ORDER BY
         widget = AddTransactWidget(self, self.expenses)
         if widget.exec() == 1:
             values = widget.get_input()
+            image_path = values[-1]
             try:
                 if values[0] == "0":
                     raise ValueError
                 date_obj = datetime.strptime(values[1], "%d %m %Y %H:%M")
                 values[1] = date_obj.strftime("%Y-%m-%d %H:%M")
-                sql = f"""insert into transactions(date, amount, expenses_id, description, is_expense) 
-                    values("{values[1]}", {values[0]}, (select id from expenses where name = "{values[2]}"), "{values[3]}", 1)"""
-                self.connection.cursor().execute(sql)
+
+                if image_path:
+                    with open(image_path, 'rb') as file:
+                        img_data = file.read()
+
+                    sql = """INSERT INTO transactions (date, amount, expenses_id, description, is_expense, image_path, image_data)
+                                    VALUES (?, ?, (SELECT id FROM expenses WHERE name = ?), ?, ?, ?, ?)"""
+                    cursor = self.connection.cursor()
+                    cursor.execute(sql, (values[1], values[0], values[2], values[3], 1, image_path, img_data))
+                    self.connection.commit()
+
+                else:
+                    sql = """INSERT INTO transactions (date, amount, expenses_id, description, is_expense)
+                                    VALUES (?, ?, (SELECT id FROM expenses WHERE name = ?), ?, ?)"""
+                    cursor = self.connection.cursor()
+                    cursor.execute(sql, (values[1], values[0], values[2], values[3], 1))
+                    self.connection.commit()
+
             except ValueError:
                 self.error(f"Не удалось записать данные: сумма не может быть нулевой")
             except Exception as e:
@@ -238,14 +296,29 @@ ORDER BY
         widget = AddTransactWidget(self, self.incomes)
         if widget.exec() == 1:
             values = widget.get_input()
+            image_path = values[-1]
             try:
                 if values[0] == "0":
-                    raise Exception
+                    raise ValueError
                 date_obj = datetime.strptime(values[1], "%d %m %Y %H:%M")
                 values[1] = date_obj.strftime("%Y-%m-%d %H:%M")
-                sql = f"""insert into transactions(date, amount, incomes_id, description, is_expense) 
-                            values("{values[1]}", {values[0]}, (select id from incomes where name = "{values[2]}"), "{values[3]}", 0)"""
-                self.connection.cursor().execute(sql)
+
+                if image_path:
+                    with open(image_path, 'rb') as file:
+                        img_data = file.read()
+
+                    sql = """INSERT INTO transactions (date, amount, incomes_id, description, is_expense, image_path, image_data)
+                                                VALUES (?, ?, (SELECT id FROM expenses WHERE name = ?), ?, ?, ?, ?)"""
+                    cursor = self.connection.cursor()
+                    cursor.execute(sql, (values[1], values[0], values[2], values[3], 0, image_path, img_data))
+                    self.connection.commit()
+
+                else:
+                    sql = """INSERT INTO transactions (date, amount, expenses_id, description, is_expense)
+                                                VALUES (?, ?, (SELECT id FROM expenses WHERE name = ?), ?, ?)"""
+                    cursor = self.connection.cursor()
+                    cursor.execute(sql, (values[1], values[0], values[2], values[3], 1))
+                    self.connection.commit()
             except Exception:
                 self.error('не верно введены значения')
             else:
@@ -255,6 +328,7 @@ ORDER BY
     def graphic_expenses(self):
         cursor = self.connection.cursor()
         id = self.buttonGroup.checkedId()
+        is_expense = True if self.buttonGroup_graphic.checkedId() == 0 else False
 
         dates = [QDate.currentDate().addDays(-QDate.currentDate().dayOfWeek() - 7 * self.countclicks),
                  QDate.currentDate().addDays(-QDate.currentDate().day() + 1).addMonths(-self.countclicks),
@@ -267,17 +341,26 @@ ORDER BY
 
         self.first_date.setText(f"от {dates[id].toString("d MMM yyyy")}")
         self.last_date.setText(f"до {dates1[id].toString("d MMM yyyy")}")
-
-        query = f"""SELECT e.name, SUM(amount) AS total_amount
-                    FROM transactions t
-                    JOIN expenses e ON t.expenses_id = e.id
-                    WHERE date >= "{date}" and date <= "{date1}" and is_expense = 1
-                    GROUP BY e.name
-                    ORDER BY total_amount DESC
-                    LIMIT 5;
-                """
-        self.amount_expenses(date, date1)
-        self.select_graphics_transactions(date, date1)
+        if is_expense:
+            query = f"""SELECT e.name, SUM(amount) AS total_amount
+                        FROM transactions t
+                        JOIN expenses e ON t.expenses_id = e.id
+                        WHERE date >= "{date}" and date <= "{date1}" and is_expense = 1
+                        GROUP BY e.name
+                        ORDER BY total_amount DESC
+                        LIMIT 5;
+                    """
+        else:
+            query = f"""SELECT i.name, SUM(amount) AS total_amount
+                        FROM transactions t
+                        JOIN incomes i ON t.incomes_id = i.id
+                        WHERE date >= "{date}" and date <= "{date1}" and is_expense = 0
+                        GROUP BY i.name
+                        ORDER BY total_amount DESC
+                        LIMIT 5;
+                    """
+        self.amount_expenses(date, date1, is_expense)
+        self.select_graphics_transactions(date, date1, is_expense)
         a = cursor.execute(query).fetchall()
         self.scene.clear()
         if not a:
@@ -299,7 +382,11 @@ ORDER BY
             spacing = 15
 
             max_bar_height = 170
-
+            colors = [[54, 162, 235],
+                      [255, 99, 132],
+                      [75, 192, 192],
+                      [153, 102, 255],
+                      [255, 159, 64]]
             for index, (category, amount) in enumerate(zip(categories, amounts)):
                 bar_height = (amount / max_amount) * max_bar_height
 
@@ -308,7 +395,7 @@ ORDER BY
                     max_bar_height - bar_height,
                     bar_width,
                     bar_height,
-                    brush=QBrush(QColor(150, 150, 255))
+                    brush=QBrush(QColor(*colors[index]))
                 )
 
                 text_item = QGraphicsTextItem(category)
@@ -327,25 +414,23 @@ ORDER BY
 
             self.scene.setSceneRect(QRectF(0, 0, len(categories) * (bar_width + spacing), max_bar_height + 50))
 
-    def select_graphics_transactions(self, date, date1):
-        query = f'''SELECT 
-    t.amount, 
-    t.date, 
-    CASE 
-        WHEN t.is_expense = 1 THEN e.name
-        ELSE i.name
-    END AS category_name, 
-    t.description,
-    t.id
-FROM 
-    transactions t
-LEFT JOIN 
-    expenses e ON t.expenses_id = e.id
-LEFT JOIN 
-    incomes i ON t.incomes_id = i.id
-    WHERE date >= "{date}" and date <= "{date1}"
-ORDER BY 
-    t.date DESC;'''
+    def select_graphics_transactions(self, date, date1, is_expense):
+        if is_expense:
+            query = f'''SELECT t.amount, t.date, e.name, t.description, t.id FROM transactions t
+                LEFT JOIN 
+                    expenses e ON t.expenses_id = e.id
+                    WHERE date >= "{date}" and date <= "{date1}" and is_expense = 1
+                ORDER BY 
+                    t.date DESC;'''
+        else:
+            query = f'''SELECT t.amount, t.date, i.name, t.description, t.id
+                FROM 
+                    transactions t
+                LEFT JOIN 
+                    incomes i ON t.incomes_id = i.id
+                    WHERE date >= "{date}" and date <= "{date1}" and is_expense = 0
+                ORDER BY 
+                    t.date DESC;'''
 
         res = self.connection.cursor().execute(query).fetchall()
         self.tableWidget2.setColumnCount(5)
