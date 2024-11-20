@@ -253,7 +253,7 @@ border-color: rgb(88, 88, 88);</string>
       <x>210</x>
       <y>370</y>
       <width>501</width>
-      <height>451</height>
+      <height>471</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -333,6 +333,13 @@ border-color: rgb(88, 88, 88);</string>
         </widget>
        </item>
       </layout>
+     </item>
+     <item>
+      <widget class="QPushButton" name="editBtn">
+       <property name="text">
+        <string>Изменить</string>
+       </property>
+      </widget>
      </item>
      <item>
       <widget class="QPushButton" name="deleteBtn">

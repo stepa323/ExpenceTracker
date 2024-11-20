@@ -13,18 +13,46 @@ from PyQt6.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QDialog
 
 
 class AddTransactWidget(QDialog):
-    def __init__(self, parent, lst):
+    def __init__(self, parent, conn, r_id=-1, is_expense=False):
         super().__init__(parent)
         self.file_path = None
         uic.loadUi('AddTransactionWidget.ui', self)
-        self.comboBox.addItems(lst)
-        self.dateTimeEdit.setMinimumDate(QDate.currentDate().addDays(-365 * 5))
-        self.dateTimeEdit.setMaximumDate(QDate.currentDate())
-        self.dateTimeEdit.setDate(QDate.currentDate())
-        self.dateTimeEdit.setTime(QTime.currentTime())
+
+        self.expenses = [el[0] for el in conn.cursor().execute('select name from expenses').fetchall()]
+        self.incomes = [el[0] for el in conn.cursor().execute('select name from incomes').fetchall()]
+
+        if r_id == -1:
+            self.dateTimeEdit.setDate(QDate.currentDate())
+            self.dateTimeEdit.setTime(QTime.currentTime())
+            if is_expense:
+                self.comboBox.addItems(self.expenses)
+            else:
+                self.comboBox.addItems(self.incomes)
+        else:
+            sql = f'''select amount, date, case when is_expense = 0 then incomes_id else expenses_id end as category_id, description, image_path, is_expense from transactions
+            where id = ?'''
+            data = conn.cursor().execute(sql, (r_id,)).fetchall()
+            data = data[0]
+            self.amount.setText(str(data[0]))
+            date, time = data[1].split()
+            print(date, time)
+            date = QDate.fromString(date, 'yyyy.MM.dd')
+            time = QTime.fromString(time, 'hh:mm')
+            print(date, time)
+            self.dateTimeEdit.setDate(date)
+            self.dateTimeEdit.setTime(time)
+            self.comboBox.setCurrentIndex(data[2])
+            self.description.setText(data[3])
+            self.file_path = data[4]
+            is_expense = True if data[5] == 1 else False
+            if is_expense:
+                self.comboBox.addItems(self.expenses)
+            else:
+                self.comboBox.addItems(self.incomes)
+
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
-        self.dateTimeEdit.setDisplayFormat("dd MM yyyy hh:mm")
+        self.dateTimeEdit.setDisplayFormat("yyyy.MM.dd hh:mm")
         self.addImage.clicked.connect(self.load_image)
 
     def load_image(self):
@@ -34,7 +62,7 @@ class AddTransactWidget(QDialog):
         self.image_loaded.setText(f"{self.file_path.split('/')[-1]} {self.file_path}")
 
     def get_input(self):
-        return [self.lineEdit.text(), self.dateTimeEdit.text(), self.comboBox.currentText(), self.lineEdit_2.text(),
+        return [self.amount.text(), self.dateTimeEdit.text(), self.comboBox.currentText(), self.description.text(),
                 self.file_path]
 
 
@@ -70,12 +98,45 @@ class MainWindow(QMainWindow):
         self.addExpenseBtn.clicked.connect(self.addExpense)
         self.addIncomeBtn.clicked.connect(self.addIncome)
         self.saveBtn.clicked.connect(self.save_to_csv)
+        self.editBtn.clicked.connect(self.update_data)
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_date_time)
         self.timer.start(1000)
 
         self.refresh()
+
+    def update_data(self):
+        selected_row = self.tableWidget.currentRow()
+        if selected_row != -1:
+            try:
+                r_id = self.tableWidget.item(selected_row, 5).text()
+
+                widget = AddTransactWidget(self, self.connection, r_id=r_id)
+                if widget.exec() == 1:
+                    values = widget.get_input()
+                    if int(values[0]) <= 0:
+                        raise ValueError
+                    is_expense = \
+                        self.connection.cursor().execute('select is_expense from transactions where id = ?',
+                                                         (r_id,)).fetchall()[0][0]
+                    if is_expense == '0':
+                        sql = (
+                            'update transactions set amount = ?, date = ?, incomes_id = (SELECT id FROM incomes WHERE name = ?), description = ?, image_path = ? '
+                            'where id = ?')
+                    else:
+                        sql = (
+                            'update transactions set amount = ?, date = ?, expenses_id = (SELECT id FROM expenses WHERE name = ?), description = ?, image_path = ? '
+                            f'where id = {r_id}')
+                    self.connection.cursor().execute(sql, (values))
+            except Exception as e:
+                self.error(f"Не удалось изменить: {str(e)}")
+            else:
+                self.connection.commit()
+                self.refresh()
+        else:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите запись для изменения.")
+            return
 
     def save_to_csv(self):
         fileName, _ = QFileDialog.getSaveFileName(self, "Сохранить файл", "", "CSV Files (*.csv);;All Files (*)")
@@ -198,7 +259,6 @@ class MainWindow(QMainWindow):
 
         for i, row in enumerate(res):
             expense = row[2] not in self.incomes
-            print(row)
             image_path = row[5]
             image_data = row[6]
 
@@ -232,14 +292,6 @@ class MainWindow(QMainWindow):
                     item.setText(str(elem))
 
                 elif j == 1:
-                    try:
-                        date_obj = datetime.strptime(elem, "%Y-%m-%d %H:%M")
-                        elem = date_obj.strftime("%d %b %Y, %H:%M")
-                        item.setText(str(elem))
-                    except ValueError:
-                        item.setText(str(elem))
-
-                else:
                     item.setText(str(elem))
 
                 self.tableWidget.setItem(i, j + 1, item)
@@ -254,16 +306,13 @@ class MainWindow(QMainWindow):
         self.refresh_graph()
 
     def addExpense(self):
-        widget = AddTransactWidget(self, self.expenses)
+        widget = AddTransactWidget(self, self.connection, is_expense=True)
         if widget.exec() == 1:
             values = widget.get_input()
             image_path = values[-1]
             try:
-                if values[0] == "0":
+                if int(values[0]) <= 0:
                     raise ValueError
-                date_obj = datetime.strptime(values[1], "%d %m %Y %H:%M")
-                values[1] = date_obj.strftime("%Y-%m-%d %H:%M")
-
                 if image_path:
                     with open(image_path, 'rb') as file:
                         img_data = file.read()
@@ -282,7 +331,7 @@ class MainWindow(QMainWindow):
                     self.connection.commit()
 
             except ValueError:
-                self.error(f"Не удалось записать данные: сумма не может быть нулевой")
+                self.error(f"Не удалось записать данные: неправильная сумма")
             except Exception as e:
                 self.error(f"Не удалось записать данные: {str(e)}")
             else:
@@ -290,16 +339,13 @@ class MainWindow(QMainWindow):
                 self.refresh()
 
     def addIncome(self):
-        widget = AddTransactWidget(self, self.incomes)
+        widget = AddTransactWidget(self, self.connection, is_expense=False)
         if widget.exec() == 1:
             values = widget.get_input()
             image_path = values[-1]
             try:
-                if values[0] == "0":
+                if int(values[0]) <= 0:
                     raise ValueError
-                date_obj = datetime.strptime(values[1], "%d %m %Y %H:%M")
-                values[1] = date_obj.strftime("%Y-%m-%d %H:%M")
-
                 if image_path:
                     with open(image_path, 'rb') as file:
                         img_data = file.read()
@@ -316,6 +362,8 @@ class MainWindow(QMainWindow):
                     cursor = self.connection.cursor()
                     cursor.execute(sql, (values[1], values[0], values[2], values[3], 1))
                     self.connection.commit()
+            except ValueError:
+                self.error(f"Не удалось записать данные: неправильная сумма")
             except Exception:
                 self.error('не верно введены значения')
             else:
@@ -333,8 +381,8 @@ class MainWindow(QMainWindow):
                      -QDate.currentDate().month() + 1).addYears(-self.countclicks)]
         dates1 = [dates[0].addDays(7), dates[1].addMonths(1), dates[2].addYears(1)]
 
-        date1 = dates1[id].toString("yyyy-MM-dd")
-        date = dates[id].toString("yyyy-MM-dd")
+        date1 = dates1[id].toString("yyyy.MM.dd")
+        date = dates[id].toString("yyyy.MM.dd")
 
         self.first_date.setText(f"от {dates[id].toString("d MMM yyyy")}")
         self.last_date.setText(f"до {dates1[id].toString("d MMM yyyy")}")
@@ -452,9 +500,6 @@ class MainWindow(QMainWindow):
                         i, j, QTableWidgetItem(str(elem)))
                     self.tableWidget2.item(i, j).setForeground(QColor(0, 100, 0))
                 else:
-                    if j == 1:
-                        date_obj = datetime.strptime(elem, "%Y-%m-%d %H:%M")
-                        elem = date_obj.strftime("%d %b %Y, %H:%M")
                     self.tableWidget2.setItem(
                         i, j, QTableWidgetItem(str(elem)))
 
