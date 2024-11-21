@@ -250,9 +250,9 @@ border-color: rgb(88, 88, 88);</string>
    <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
-      <x>210</x>
+      <x>150</x>
       <y>370</y>
-      <width>501</width>
+      <width>601</width>
       <height>471</height>
      </rect>
     </property>
@@ -274,11 +274,6 @@ border-color: rgb(88, 88, 88);</string>
      </item>
      <item>
       <widget class="QTableWidget" name="tableWidget">
-       <column>
-        <property name="text">
-         <string>Картинка</string>
-        </property>
-       </column>
        <column>
         <property name="text">
          <string>Сумма</string>
@@ -453,7 +448,7 @@ background-color: rgb(186, 186, 186);</string>
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup"/>
   <buttongroup name="buttonGroup_graphic"/>
+  <buttongroup name="buttonGroup"/>
  </buttongroups>
 </ui>

@@ -3,10 +3,9 @@ import io
 import sys
 
 import sqlite3
-from datetime import datetime
 
 from PyQt6 import uic
-from PyQt6.QtCore import QDate, QTime, QRectF, QTimer, QDateTime, Qt
+from PyQt6.QtCore import QDate, QTime, QRectF, QTimer, QDateTime
 from PyQt6.QtGui import QBrush, QColor, QFont, QPixmap, QIcon
 from PyQt6.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QDialog, QGraphicsScene, \
     QGraphicsTextItem, QMessageBox, QFileDialog
@@ -34,17 +33,20 @@ class AddTransactWidget(QDialog):
             data = conn.cursor().execute(sql, (r_id,)).fetchall()
             data = data[0]
             self.amount.setText(str(data[0]))
+
             date, time = data[1].split()
-            print(date, time)
             date = QDate.fromString(date, 'yyyy.MM.dd')
             time = QTime.fromString(time, 'hh:mm')
-            print(date, time)
+
             self.dateTimeEdit.setDate(date)
             self.dateTimeEdit.setTime(time)
             self.comboBox.setCurrentIndex(data[2])
             self.description.setText(data[3])
             self.file_path = data[4]
+            self.show_image()
+
             is_expense = True if data[5] == 1 else False
+
             if is_expense:
                 self.comboBox.addItems(self.expenses)
             else:
@@ -54,12 +56,24 @@ class AddTransactWidget(QDialog):
         self.buttonBox.rejected.connect(self.reject)
         self.dateTimeEdit.setDisplayFormat("yyyy.MM.dd hh:mm")
         self.addImage.clicked.connect(self.load_image)
+        self.deleteImg.clicked.connect(self.delete_image)
+
+    def show_image(self):
+        try:
+            pixmap = QPixmap(self.file_path).scaled(50, 50)
+            self.image_loaded.setPixmap(pixmap)
+        except Exception as e:
+            QMessageBox.critical(self, 'Ошибка', f'{e}')
+
+    def delete_image(self):
+        self.file_path = None
+        self.image_loaded.clear()
 
     def load_image(self):
         file_dialog = QFileDialog(self)
         file_dialog.setNameFilter('Images (*.png *.jpg *.jpeg *.bmp *.gif)')
         self.file_path, _ = file_dialog.getOpenFileName(self, "Выберите изображение")
-        self.image_loaded.setText(f"{self.file_path.split('/')[-1]} {self.file_path}")
+        self.show_image()
 
     def get_input(self):
         return [self.amount.text(), self.dateTimeEdit.text(), self.comboBox.currentText(), self.description.text(),
@@ -110,7 +124,7 @@ class MainWindow(QMainWindow):
         selected_row = self.tableWidget.currentRow()
         if selected_row != -1:
             try:
-                r_id = self.tableWidget.item(selected_row, 5).text()
+                r_id = self.tableWidget.item(selected_row, 4).text()
 
                 widget = AddTransactWidget(self, self.connection, r_id=r_id)
                 if widget.exec() == 1:
@@ -128,7 +142,7 @@ class MainWindow(QMainWindow):
                         sql = (
                             'update transactions set amount = ?, date = ?, expenses_id = (SELECT id FROM expenses WHERE name = ?), description = ?, image_path = ? '
                             f'where id = {r_id}')
-                    self.connection.cursor().execute(sql, (values))
+                    self.connection.cursor().execute(sql, (values, ))
             except Exception as e:
                 self.error(f"Не удалось изменить: {str(e)}")
             else:
@@ -238,8 +252,7 @@ class MainWindow(QMainWindow):
             END AS category_name, 
             t.description,
             t.id,
-            t.image_path, 
-            t.image_data
+            t.image_path
         FROM 
             transactions t
         LEFT JOIN 
@@ -251,7 +264,7 @@ class MainWindow(QMainWindow):
 
         res = self.connection.cursor().execute(query).fetchall()
 
-        self.tableWidget.setColumnCount(6)
+        self.tableWidget.setColumnCount(5)
         self.tableWidget.setRowCount(len(res))
 
         expense_color = QColor(100, 0, 0)
@@ -260,26 +273,8 @@ class MainWindow(QMainWindow):
         for i, row in enumerate(res):
             expense = row[2] not in self.incomes
             image_path = row[5]
-            image_data = row[6]
 
-            if image_path:
-                pixmap = QPixmap(image_path)
-                if not pixmap.isNull():
-                    icon = QIcon(pixmap.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio))
-                    item = QTableWidgetItem()
-                    item.setIcon(icon)
-                    self.tableWidget.setItem(i, 0, item)
-            elif image_data:
-                image_stream = io.BytesIO(image_data)
-                pixmap = QPixmap()
-                pixmap.loadFromData(image_stream.read())
-                if not pixmap.isNull():
-                    icon = QIcon(pixmap.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio))
-                    item = QTableWidgetItem()
-                    item.setIcon(icon)
-                    self.tableWidget.setItem(i, 0, item)
-
-            for j, elem in enumerate(row[:-2]):
+            for j, elem in enumerate(row[:-1]):
                 item = QTableWidgetItem(str(elem))
 
                 if j == 0:
@@ -294,14 +289,18 @@ class MainWindow(QMainWindow):
                 elif j == 1:
                     item.setText(str(elem))
 
-                self.tableWidget.setItem(i, j + 1, item)
+                self.tableWidget.setItem(i, j, item)
 
-        self.tableWidget.setColumnWidth(0, 60)
-        self.tableWidget.setColumnWidth(1, 80)
-        self.tableWidget.setColumnWidth(2, 125)
+            if image_path:
+                pixmap = QPixmap(image_path)
+                if not pixmap.isNull():
+                    icon = QIcon(pixmap)
+                    self.tableWidget.item(i, 0).setIcon(icon)
+
+        self.tableWidget.setColumnWidth(0, 90)
+        self.tableWidget.setColumnWidth(1, 130)
+        self.tableWidget.setColumnWidth(2, 150)
         self.tableWidget.setColumnWidth(3, 130)
-        self.tableWidget.setColumnWidth(4, 150)
-        self.tableWidget.setColumnWidth(5, 60)
 
         self.refresh_graph()
 
@@ -461,16 +460,16 @@ class MainWindow(QMainWindow):
 
     def select_graphics_transactions(self, date, date1, is_expense):
         if is_expense:
-            query = f'''SELECT t.amount, t.date, e.name, t.description, t.id FROM transactions t
+            query = f'''SELECT t.amount, t.date, e.name, t.description, t.id, t.image_path 
+            FROM transactions t
                 LEFT JOIN 
                     expenses e ON t.expenses_id = e.id
                     WHERE date >= "{date}" and date <= "{date1}" and is_expense = 1
                 ORDER BY 
                     t.date DESC;'''
         else:
-            query = f'''SELECT t.amount, t.date, i.name, t.description, t.id
-                FROM 
-                    transactions t
+            query = f'''SELECT t.amount, t.date, i.name, t.description, t.id , t.image_path
+                FROM transactions t
                 LEFT JOIN 
                     incomes i ON t.incomes_id = i.id
                     WHERE date >= "{date}" and date <= "{date1}" and is_expense = 0
@@ -479,34 +478,42 @@ class MainWindow(QMainWindow):
 
         res = self.connection.cursor().execute(query).fetchall()
         self.tableWidget2.setColumnCount(5)
-        self.tableWidget2.setRowCount(0)
+        self.tableWidget2.setRowCount(len(res))
+
+        expense_color = QColor(100, 0, 0)
+        income_color = QColor(0, 100, 0)
 
         for i, row in enumerate(res):
-            self.tableWidget2.setRowCount(
-                self.tableWidget2.rowCount() + 1)
-            if row[2] in self.incomes:
-                expense = False
-            else:
-                expense = True
-            for j, elem in enumerate(row):
-                if j == 0 and expense:
-                    elem = f"-{elem}"
-                    self.tableWidget2.setItem(
-                        i, j, QTableWidgetItem(str(elem)))
-                    self.tableWidget2.item(i, j).setForeground(QColor(100, 0, 0))
-                elif j == 0 and not expense:
-                    elem = f'+{elem}'
-                    self.tableWidget2.setItem(
-                        i, j, QTableWidgetItem(str(elem)))
-                    self.tableWidget2.item(i, j).setForeground(QColor(0, 100, 0))
-                else:
-                    self.tableWidget2.setItem(
-                        i, j, QTableWidgetItem(str(elem)))
+            expense = row[2] not in self.incomes
+            image_path = row[5]
 
-        self.tableWidget2.setColumnWidth(0, 80)
-        self.tableWidget2.setColumnWidth(1, 125)
-        self.tableWidget2.setColumnWidth(2, 130)
-        self.tableWidget2.setColumnWidth(3, 150)
+            for j, elem in enumerate(row[:-1]):
+                item = QTableWidgetItem(str(elem))
+
+                if j == 0:
+                    if expense:
+                        elem = f"-{elem}"
+                        item.setForeground(expense_color)
+                    else:
+                        elem = f"+{elem}"
+                        item.setForeground(income_color)
+                    item.setText(str(elem))
+
+                elif j == 1:
+                    item.setText(str(elem))
+
+                self.tableWidget2.setItem(i, j, item)
+
+            if image_path:
+                pixmap = QPixmap(image_path)
+                if not pixmap.isNull():
+                    icon = QIcon(pixmap)
+                    self.tableWidget2.item(i, 0).setIcon(icon)
+
+        self.tableWidget2.setColumnWidth(0, 90)
+        self.tableWidget2.setColumnWidth(1, 130)
+        self.tableWidget2.setColumnWidth(2, 150)
+        self.tableWidget2.setColumnWidth(3, 130)
 
     def error(self, error):
         QMessageBox.critical(self, 'Ошибка', error)
