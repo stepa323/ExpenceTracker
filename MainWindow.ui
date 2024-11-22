@@ -60,24 +60,6 @@
       </layout>
      </item>
      <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_4">
-       <item>
-        <widget class="QLabel" name="first_date">
-         <property name="text">
-          <string>от:</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="last_date">
-         <property name="text">
-          <string>до:</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
       <widget class="QLabel" name="amountExpenses">
        <property name="font">
         <font>
@@ -143,6 +125,24 @@
          <attribute name="buttonGroup">
           <string notr="true">buttonGroup</string>
          </attribute>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_4">
+       <item>
+        <widget class="QLabel" name="first_date">
+         <property name="text">
+          <string>от:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="last_date">
+         <property name="text">
+          <string>до:</string>
+         </property>
         </widget>
        </item>
       </layout>
