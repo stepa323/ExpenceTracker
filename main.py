@@ -83,6 +83,7 @@ class AddTransactWidget(QDialog):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.timer = QTimer(self)
         uic.loadUi('MainWindow.ui', self)
 
         self.countclicks = 0
@@ -114,7 +115,6 @@ class MainWindow(QMainWindow):
         self.saveBtn.clicked.connect(self.save_to_csv)
         self.editBtn.clicked.connect(self.update_data)
 
-        self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_date_time)
         self.timer.start(1000)
 
@@ -142,7 +142,7 @@ class MainWindow(QMainWindow):
                         sql = (
                             'update transactions set amount = ?, date = ?, expenses_id = (SELECT id FROM expenses WHERE name = ?), description = ?, image_path = ? '
                             f'where id = {r_id}')
-                    self.connection.cursor().execute(sql, (values, ))
+                    self.connection.cursor().execute(sql, values)
             except Exception as e:
                 self.error(f"Не удалось изменить: {str(e)}")
             else:
@@ -153,10 +153,10 @@ class MainWindow(QMainWindow):
             return
 
     def save_to_csv(self):
-        fileName, _ = QFileDialog.getSaveFileName(self, "Сохранить файл", "", "CSV Files (*.csv);;All Files (*)")
+        file_name, _ = QFileDialog.getSaveFileName(self, "Сохранить файл", "", "CSV Files (*.csv);;All Files (*)")
 
-        if fileName:
-            with open(fileName, mode='w', newline='', encoding='utf-8') as file:
+        if file_name:
+            with open(file_name, mode='w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
                 for row in range(self.tableWidget.rowCount()):
                     row_data = []
@@ -165,7 +165,7 @@ class MainWindow(QMainWindow):
                         row_data.append(item.text() if item else "")
 
                     writer.writerow(row_data)
-            print("Данные сохранены в", fileName)
+            print("Данные сохранены в", file_name)
 
     def deleteTran(self):
         selected_row = self.tableWidget.currentRow()
@@ -356,22 +356,22 @@ class MainWindow(QMainWindow):
                     self.connection.commit()
 
                 else:
-                    sql = """INSERT INTO transactions (date, amount, expenses_id, description, is_expense)
-                                                VALUES (?, ?, (SELECT id FROM expenses WHERE name = ?), ?, ?)"""
+                    sql = """INSERT INTO transactions (date, amount, incomes_id, description, is_expense)
+                                                VALUES (?, ?, (SELECT id FROM incomes WHERE name = ?), ?, ?)"""
                     cursor = self.connection.cursor()
                     cursor.execute(sql, (values[1], values[0], values[2], values[3], 1))
                     self.connection.commit()
             except ValueError:
                 self.error(f"Не удалось записать данные: неправильная сумма")
-            except Exception:
-                self.error('не верно введены значения')
+            except Exception as e:
+                self.error(f'Ошибка: {e}')
             else:
                 self.connection.commit()
                 self.refresh()
 
     def graphic_expenses(self):
         cursor = self.connection.cursor()
-        id = self.buttonGroup.checkedId()
+        b_id = self.buttonGroup.checkedId()
         is_expense = True if self.buttonGroup_graphic.checkedId() == 0 else False
 
         dates = [QDate.currentDate().addDays(-QDate.currentDate().dayOfWeek() - 7 * self.countclicks),
@@ -380,11 +380,11 @@ class MainWindow(QMainWindow):
                      -QDate.currentDate().month() + 1).addYears(-self.countclicks)]
         dates1 = [dates[0].addDays(7), dates[1].addMonths(1), dates[2].addYears(1)]
 
-        date1 = dates1[id].toString("yyyy.MM.dd")
-        date = dates[id].toString("yyyy.MM.dd")
+        date1 = dates1[b_id].toString("yyyy.MM.dd")
+        date = dates[b_id].toString("yyyy.MM.dd")
 
-        self.first_date.setText(f"от {dates[id].toString("d MMM yyyy")}")
-        self.last_date.setText(f"до {dates1[id].toString("d MMM yyyy")}")
+        self.first_date.setText(f"от {dates[b_id].toString("d MMM yyyy")}")
+        self.last_date.setText(f"до {dates1[b_id].toString("d MMM yyyy")}")
         if is_expense:
             query = f"""SELECT e.name, SUM(amount) AS total_amount
                         FROM transactions t
@@ -434,7 +434,7 @@ class MainWindow(QMainWindow):
             for index, (category, amount) in enumerate(zip(categories, amounts)):
                 bar_height = (amount / max_amount) * max_bar_height
 
-                rect = self.scene.addRect(
+                self.scene.addRect(
                     index * (bar_width + spacing),
                     max_bar_height - bar_height,
                     bar_width,
