@@ -169,25 +169,24 @@ class MainWindow(QMainWindow):
 
     def deleteTran(self):
         selected_row = self.tableWidget.currentRow()
+        try:
+            if selected_row == -1:
+                QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите запись для удаления.")
+                return
 
-        if selected_row == -1:
-            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите запись для удаления.")
-            return
+            item = self.tableWidget.item(selected_row, 4)
+            record_id = item.text()
+            cursor = self.connection.cursor()
+            sql = "select amount, date from transactions where id = ?"
+            a = cursor.execute(sql, (record_id,)).fetchall()
+            amount, date = a[0]
 
-        item = self.tableWidget.item(selected_row, 5)
-        record_id = item.text()
-        cursor = self.connection.cursor()
-        sql = "select amount, date from transactions where id = ?"
-        a = cursor.execute(sql, (record_id,)).fetchall()
-        amount, date = a[0]
+            reply = QMessageBox.question(self, 'Подтверждение удаления',
+                                         f"Вы действительно хотите удалить транзакцию ID: {record_id}; сумма: {amount}; дата: {date}",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                         QMessageBox.StandardButton.No)
 
-        reply = QMessageBox.question(self, 'Подтверждение удаления',
-                                     f"Вы действительно хотите удалить транзакцию ID: {record_id}; сумма: {amount}; дата: {date}",
-                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                                     QMessageBox.StandardButton.No)
-
-        if reply == QMessageBox.StandardButton.Yes:
-            try:
+            if reply == QMessageBox.StandardButton.Yes:
                 cursor.execute("DELETE FROM transactions WHERE id = ?", (record_id,))
                 self.connection.commit()
 
@@ -195,8 +194,8 @@ class MainWindow(QMainWindow):
 
                 QMessageBox.information(self, "Успех", f"Запись с ID {record_id} удалена.")
                 self.refresh()
-            except Exception as e:
-                self.error(f"Не удалось удалить запись: {str(e)}")
+        except Exception as e:
+            self.error(f"Не удалось удалить запись: {str(e)}")
 
     def update_date_time(self):
         date_time = QDateTime.currentDateTime()
