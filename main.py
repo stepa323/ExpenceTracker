@@ -15,7 +15,7 @@ class AddTransactWidget(QDialog):
     def __init__(self, parent, conn, r_id=-1, is_expense=False):
         super().__init__(parent)
         self.file_path = None
-        uic.loadUi('AddTransactionWidget.ui', self)
+        uic.loadUi('ui/AddTransactionWidget.ui', self)
 
         self.expenses = [el[0] for el in conn.cursor().execute('select name from expenses').fetchall()]
         self.incomes = [el[0] for el in conn.cursor().execute('select name from incomes').fetchall()]
@@ -84,11 +84,11 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.timer = QTimer(self)
-        uic.loadUi('MainWindow.ui', self)
+        uic.loadUi('ui/MainWindow.ui', self)
 
         self.countclicks = 0
         self.scene = QGraphicsScene(self)
-        self.connection = sqlite3.connect("DB.sqlite")
+        self.connection = sqlite3.connect("db.sqlite")
         self.expenses = [el[0] for el in self.connection.cursor().execute('select name from expenses').fetchall()]
         self.incomes = [el[0] for el in self.connection.cursor().execute('select name from incomes').fetchall()]
         self.initUi()
